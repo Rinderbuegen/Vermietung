@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#254f6e">
+    <meta name="description" content="Öffentliche Gebäudevermietung mit Belegung, Anfrageformular, Hinweisen und Downloads.">
+    <title>Gebäudevermietung</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="assets/css/app.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+    <header class="site-header">
+      <div class="shell header-grid">
+        <a class="brand" href="#start" aria-label="Startseite">
+          <span class="brand-mark" aria-hidden="true">G</span>
+          <span>
+            <strong data-app-title>Gebäudevermietung</strong>
+            <small data-operator-name>Betreiber</small>
+          </span>
+        </a>
+        <nav class="main-nav" aria-label="Hauptnavigation">
+          <a href="#belegung">Belegung</a>
+          <a href="#anfrage">Anfrage</a>
+          <a href="#hinweise">Hinweise</a>
+          <a href="#downloads">Downloads</a>
+          <a href="#kontakt">Kontakt</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section id="start" class="hero section">
+        <div class="shell hero-grid">
+          <div>
+            <p class="eyebrow">Öffentliche Reservierungsanfrage</p>
+            <h1 data-app-title>Gebäudevermietung</h1>
+            <p class="lead" data-public-note>Prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage. Die verbindliche Bestätigung erfolgt durch den Betreiber.</p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#anfrage">Buchungsanfrage stellen</a>
+              <a class="button button-secondary" href="#belegung">Belegung ansehen</a>
+            </div>
+          </div>
+          <aside class="building-card" aria-label="Gebäudedaten">
+            <dl>
+              <div>
+                <dt>Gebäude</dt>
+                <dd data-building-name>Wird geladen</dd>
+              </div>
+              <div>
+                <dt>Betreiber</dt>
+                <dd data-operator-name>Wird geladen</dd>
+              </div>
+              <div>
+                <dt>Kontakt</dt>
+                <dd><a data-contact-email href="mailto:kontakt@example.com">kontakt@example.com</a></dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+      </section>
+
+      <section id="belegung" class="section">
+        <div class="shell section-grid">
+          <div class="section-head">
+            <p class="eyebrow">Öffentliche Anzeige</p>
+            <h2>Belegung</h2>
+            <p>Gezeigt werden nur Datum, Uhrzeit, Status und optional ein öffentlicher Titel.</p>
+          </div>
+          <div class="panel">
+            <form class="filter-bar" id="occupancyFilter">
+              <label>
+                Zeitraum
+                <select id="occupancyRange" name="range">
+                  <option value="today">Heute</option>
+                  <option value="week" selected>Diese Woche</option>
+                  <option value="four-weeks">Nächste 4 Wochen</option>
+                  <option value="year">Dieses Jahr</option>
+                  <option value="next-year">Nächstes Jahr</option>
+                </select>
+              </label>
+              <button class="button button-secondary" type="submit">Aktualisieren</button>
+            </form>
+            <p class="meta" id="occupancyMeta">Noch nicht geladen.</p>
+            <div id="occupancyList" class="list" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="anfrage" class="section section-muted">
+        <div class="shell section-grid">
+          <div class="section-head">
+            <p class="eyebrow">Unverbindlich</p>
+            <h2>Buchungsanfrage</h2>
+            <p>Die Anfrage wird gespeichert und vom Betreiber geprüft. Sie ist noch keine verbindliche Buchung.</p>
+          </div>
+          <form class="panel form-grid" id="bookingForm" novalidate>
+            <input type="hidden" name="buildingId" data-building-id-field>
+            <label>
+              Datum *
+              <input name="date" type="date" required>
+            </label>
+            <label>
+              Ganzer Tag
+              <select name="allDay">
+                <option value="false" selected>Nein</option>
+                <option value="true">Ja</option>
+              </select>
+            </label>
+            <label>
+              Uhrzeit von *
+              <input name="from" type="time" required>
+            </label>
+            <label>
+              Uhrzeit bis *
+              <input name="to" type="time" required>
+            </label>
+            <label class="wide">
+              Name *
+              <input name="requesterName" maxlength="120" autocomplete="name" required>
+            </label>
+            <label class="wide">
+              Kontaktmöglichkeit *
+              <input name="requesterContact" maxlength="160" autocomplete="email" placeholder="E-Mail oder Telefonnummer" required>
+            </label>
+            <label class="wide">
+              Zweck / Titel *
+              <input name="title" maxlength="140" required>
+            </label>
+            <label class="wide">
+              Bemerkung
+              <textarea name="note" maxlength="1000" rows="5"></textarea>
+            </label>
+            <label class="checkbox wide">
+              <input name="privacyConsent" type="checkbox" required>
+              <span>Ich bin damit einverstanden, dass meine Angaben zur Bearbeitung der Anfrage verwendet werden. Mir ist bewusst, dass daraus noch keine verbindliche Buchung entsteht.</span>
+            </label>
+            <div class="form-actions wide">
+              <button class="button button-primary" type="submit">Anfrage senden</button>
+              <p class="form-message" id="bookingMessage" aria-live="polite"></p>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="hinweise" class="section">
+        <div class="shell section-grid">
+          <div class="section-head">
+            <p class="eyebrow">Aktuell</p>
+            <h2>Neuigkeiten / Hinweise</h2>
+            <p>Aktuelle Mitteilungen zur Nutzung des Gebäudes.</p>
+          </div>
+          <div class="panel">
+            <div id="newsList" class="list" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="downloads" class="section section-muted">
+        <div class="shell section-grid">
+          <div class="section-head">
+            <p class="eyebrow">PDF</p>
+            <h2>Downloads</h2>
+            <p>Dokumente zur Vermietung und Nutzung.</p>
+          </div>
+          <div class="panel">
+            <div id="downloadsList" class="list" aria-live="polite"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="kontakt" class="section">
+        <div class="shell section-grid">
+          <div class="section-head">
+            <p class="eyebrow">Frage ohne Termin</p>
+            <h2>Kontakt</h2>
+            <p>Nutzen Sie dieses Formular für allgemeine Fragen zur Gebäudevermietung.</p>
+          </div>
+          <form class="panel form-grid" id="contactForm" novalidate>
+            <label class="wide">
+              Name *
+              <input name="name" maxlength="120" autocomplete="name" required>
+            </label>
+            <label class="wide">
+              Kontaktmöglichkeit *
+              <input name="contact" maxlength="160" autocomplete="email" required>
+            </label>
+            <label class="wide">
+              Betreff *
+              <input name="subject" maxlength="140" required>
+            </label>
+            <label class="wide">
+              Nachricht *
+              <textarea name="message" maxlength="1200" rows="5" required></textarea>
+            </label>
+            <label class="checkbox wide">
+              <input name="privacyConsent" type="checkbox" required>
+              <span>Ich bin damit einverstanden, dass meine Angaben zur Bearbeitung der Kontaktanfrage verwendet werden.</span>
+            </label>
+            <div class="form-actions wide">
+              <button class="button button-primary" type="submit">Kontaktanfrage senden</button>
+              <p class="form-message" id="contactMessage" aria-live="polite"></p>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section id="rechtliches" class="section legal-section">
+        <div class="shell legal-grid">
+          <article class="panel">
+            <h2>Datenschutz</h2>
+            <p>Diese Anwendung verarbeitet Angaben aus Buchungs- und Kontaktformularen nur zur Bearbeitung Ihrer Anfrage. Es werden keine Tracking-Cookies eingesetzt.</p>
+            <p><strong>Platzhalter:</strong> Betreiber müssen hier vor Veröffentlichung ihre vollständige Datenschutzerklärung ergänzen.</p>
+          </article>
+          <article class="panel">
+            <h2>Impressum</h2>
+            <p><strong data-operator-name>Betreiber</strong></p>
+            <p><strong>Platzhalter:</strong> Adresse, Vertretungsberechtigte, Telefon, E-Mail und weitere Pflichtangaben ergänzen.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-grid">
+        <span data-app-title>Gebäudevermietung</span>
+        <a href="#rechtliches">Datenschutz / Impressum</a>
+      </div>
+    </footer>
+
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/ui.js"></script>
+    <script src="assets/js/app.js"></script>
+  </body>
+</html>
