@@ -2,10 +2,15 @@
   "use strict";
 
   const config = window.APP_CONFIG || {};
-  const occupancyCacheKey = `occupancy:${config.buildingId}`;
+  let currentOccupancyPayload = null;
+  let currentOccupancyRange = null;
+
+  function occupancyCacheKey(range) {
+    return `occupancy:${config.buildingId}:${range.from}:${range.to}`;
+  }
 
   function todayIso() {
-    return new Date().toISOString().slice(0, 10);
+    return iso(new Date());
   }
 
   function addDays(date, days) {
@@ -15,17 +20,45 @@
   }
 
   function iso(date) {
-    return date.toISOString().slice(0, 10);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function clampRange(range) {
+    const today = todayIso();
+    return { from: range.from < today ? today : range.from, to: range.to };
   }
 
   function rangeFromSelection(value) {
+    const select = document.getElementById("occupancyRange");
+    if (value === "selected-month" && select && select.dataset.from && select.dataset.to) {
+      return { from: select.dataset.from, to: select.dataset.to };
+    }
     const now = new Date();
     const year = now.getFullYear();
     if (value === "today") return { from: todayIso(), to: todayIso() };
     if (value === "four-weeks") return { from: todayIso(), to: iso(addDays(now, 28)) };
-    if (value === "year") return { from: `${year}-01-01`, to: `${year}-12-31` };
+    if (value === "year") return clampRange({ from: `${year}-01-01`, to: `${year}-12-31` });
     if (value === "next-year") return { from: `${year + 1}-01-01`, to: `${year + 1}-12-31` };
     return { from: todayIso(), to: iso(addDays(now, 7)) };
+  }
+
+  function monthRange(month) {
+    const start = new Date(`${month}-01T00:00:00`);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+    return clampRange({ from: iso(start), to: iso(end) });
+  }
+
+  function selectedView() {
+    const select = document.getElementById("occupancyView");
+    return select ? select.value : "table";
+  }
+
+  function renderOccupancy(payload, range) {
+    if (selectedView() === "plan") {
+      window.Ui.renderOccupancyPlan(payload.items || [], payload.loadedAt, false, range);
+      return;
+    }
+    window.Ui.renderOccupancy(payload.items || [], payload.loadedAt, false);
   }
 
   function formData(form) {
@@ -116,13 +149,21 @@
     try {
       const data = await window.Api.getOccupancy(range.from, range.to);
       const payload = { items: data.items || [], loadedAt: data.loadedAt || new Date().toISOString() };
-      localStorage.setItem(occupancyCacheKey, JSON.stringify(payload));
-      window.Ui.renderOccupancy(payload.items, payload.loadedAt, false);
+      currentOccupancyPayload = payload;
+      currentOccupancyRange = range;
+      localStorage.setItem(occupancyCacheKey(range), JSON.stringify(payload));
+      renderOccupancy(payload, range);
     } catch (error) {
-      const cached = localStorage.getItem(occupancyCacheKey);
+      const cached = localStorage.getItem(occupancyCacheKey(range));
       if (cached) {
         const payload = JSON.parse(cached);
-        window.Ui.renderOccupancy(payload.items || [], payload.loadedAt || new Date().toISOString(), true);
+        currentOccupancyPayload = payload;
+        currentOccupancyRange = range;
+        if (selectedView() === "plan") {
+          window.Ui.renderOccupancyPlan(payload.items || [], payload.loadedAt || new Date().toISOString(), true, range);
+        } else {
+          window.Ui.renderOccupancy(payload.items || [], payload.loadedAt || new Date().toISOString(), true);
+        }
         meta.textContent += ` · Abruf fehlgeschlagen: ${error.message}`;
       } else {
         meta.textContent = `Abruf fehlgeschlagen: ${error.message}`;
@@ -167,6 +208,27 @@
       } finally {
         setButtonLoading(button, false);
       }
+    });
+
+    document.getElementById("occupancyView").addEventListener("change", () => {
+      if (currentOccupancyPayload && currentOccupancyRange) {
+        renderOccupancy(currentOccupancyPayload, currentOccupancyRange);
+      }
+    });
+
+    document.getElementById("occupancyList").addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-occupancy-month]");
+      if (!button) return;
+      const select = document.getElementById("occupancyRange");
+      const option = select.querySelector('option[value="selected-month"]');
+      const range = monthRange(button.dataset.occupancyMonth);
+      select.dataset.from = range.from;
+      select.dataset.to = range.to;
+      option.textContent = button.dataset.occupancyMonthLabel || "Ausgewählter Monat";
+      option.hidden = false;
+      select.value = "selected-month";
+      document.getElementById("occupancyView").value = "table";
+      await loadOccupancy();
     });
 
     document.getElementById("bookingForm").addEventListener("submit", async (event) => {

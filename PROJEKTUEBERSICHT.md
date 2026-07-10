@@ -47,3 +47,5 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 Version 1 ist bewusst klein gehalten. Normale Nutzer erzeugen nur offene Anfragen. Betreiber entscheiden im Google Sheet.
 
 Desktop-Layout: Bei ausreichender Breite und Höhe bleiben Kopfbereich und Footer sichtbar; nur der Hauptbereich scrollt.
+
+Belegung: Nutzer können zwischen tabellarischer Liste und Belegungsplan wechseln. Im Belegungsplan sind Tage als `frei`, `belegt` oder `teilweise belegt` markiert; ein Klick auf einen Monat zeigt genau diesen Monat tabellarisch.

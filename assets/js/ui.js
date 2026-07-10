@@ -3,6 +3,8 @@
 
   const dateFormatter = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" });
   const dateTimeFormatter = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" });
+  const monthFormatter = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" });
+  const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
   function text(selector, value) {
     document.querySelectorAll(selector).forEach((node) => {
@@ -81,6 +83,89 @@
     }).join("");
   }
 
+  function iso(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  }
+
+  function monthKey(date) {
+    return iso(date).slice(0, 7);
+  }
+
+  function monthsInRange(range) {
+    const start = new Date(`${range.from.slice(0, 7)}-01T00:00:00`);
+    const end = new Date(`${range.to.slice(0, 7)}-01T00:00:00`);
+    const months = [];
+    for (const current = new Date(start); current <= end; current.setMonth(current.getMonth() + 1)) {
+      months.push(new Date(current));
+    }
+    return months;
+  }
+
+  function itemStatus(item) {
+    if (!item) return "free";
+    if (["confirmed", "blocked"].includes(item.statusKey) && item.allDay) return "busy";
+    return "partial";
+  }
+
+  function dayStatus(items) {
+    const statuses = items.map(itemStatus);
+    if (statuses.includes("busy")) return "busy";
+    if (statuses.includes("partial")) return "partial";
+    return "free";
+  }
+
+  function renderMonth(month, itemsByDate, range) {
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const offset = (firstDay.getDay() + 6) % 7;
+    const key = monthKey(firstDay);
+    const label = monthFormatter.format(firstDay);
+    const cells = [];
+
+    for (let index = 0; index < offset; index += 1) {
+      cells.push('<span class="occupancy-day is-empty" aria-hidden="true"></span>');
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${key}-${String(day).padStart(2, "0")}`;
+      if (date < range.from || date > range.to) {
+        cells.push(`<span class="occupancy-day is-out-of-range" aria-label="${escapeHtml(date)}: nicht im gewählten Zeitraum">${day}</span>`);
+        continue;
+      }
+      const status = dayStatus(itemsByDate.get(date) || []);
+      const statusLabel = status === "busy" ? "belegt" : status === "partial" ? "teilweise belegt" : "frei";
+      const dayLabel = dateFormatter.format(new Date(`${date}T00:00:00`));
+      cells.push(`<span class="occupancy-day is-${status}" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(dayLabel)}: ${escapeHtml(statusLabel)}">${day}</span>`);
+    }
+
+    return `
+      <article class="occupancy-month">
+        <button class="occupancy-month-title" type="button" data-occupancy-month="${key}" data-occupancy-month-label="${escapeHtml(label)}" aria-label="${escapeHtml(label)} tabellarisch anzeigen">${escapeHtml(label)}</button>
+        <div class="occupancy-weekdays" aria-hidden="true">${weekdays.map((day) => `<span>${day}</span>`).join("")}</div>
+        <div class="occupancy-days">${cells.join("")}</div>
+      </article>`;
+  }
+
+  function renderOccupancyPlan(items, loadedAt, stale, range) {
+    const list = document.getElementById("occupancyList");
+    const meta = document.getElementById("occupancyMeta");
+    const itemsByDate = items.reduce((map, item) => {
+      if (!map.has(item.date)) map.set(item.date, []);
+      map.get(item.date).push(item);
+      return map;
+    }, new Map());
+    meta.textContent = `${stale ? "Möglicherweise veralteter Stand" : "Stand"}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
+    list.innerHTML = `
+      <div class="occupancy-plan" aria-label="Belegungsplan">
+        ${monthsInRange(range).map((month) => renderMonth(month, itemsByDate, range)).join("")}
+      </div>
+      <div class="occupancy-legend" aria-label="Legende">
+        <span><i class="is-free"></i> frei</span>
+        <span><i class="is-busy"></i> belegt</span>
+        <span><i class="is-partial"></i> teilweise belegt</span>
+      </div>`;
+  }
+
   function renderNews(items) {
     const list = document.getElementById("newsList");
     if (!items.length) {
@@ -139,6 +224,7 @@
     applyConfig,
     setConnectionStatus,
     renderOccupancy,
+    renderOccupancyPlan,
     renderNews,
     renderDownloads,
     renderEmpty,
