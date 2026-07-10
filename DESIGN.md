@@ -141,6 +141,45 @@ Weiße Karte mitrand und Schatten:
 - `angefragt`: gelb/orange (`#c88700`), noch nicht bestätigt.
 - `abgelaufen`: grau (`#bbb`), nicht mehr gültig.
 
+## Per-Gebäude-Design
+
+Jedes Gebäude hat eigene Farben, die per `config.js` → `theme` definiert und vor dem CSS-Laden als CSS-Variablen injiziert werden. Layout und Typografie bleiben gleich.
+
+### Farbzuordnung
+
+| CSS-Variable | DGH (Dunkelrot) | ev_gem_rb (Lila) |
+|---|---|---|
+| `--color-primary` | `#6c0e15` | `#5c2583` |
+| `--color-primary-dark` | `#5a0b11` | `#4a1d69` |
+| `--color-secondary` | `#872323` | `#741cc0` |
+| `--color-link` | `#6c0e15` | `#5c2583` |
+| `--color-bg-page` | `#eaeaea` | `#f2ecfa` |
+| `--color-bg-muted` | `#f0f0f0` | `#f2ecfa` |
+| `--color-border` | `#d8d2c6` | `#e4cefa` |
+| `--color-dark` | `#525151` | `#3d3050` |
+
+### Farbquelle ev_gem_rb
+
+Farben entnommen aus dem Designsystem der Evangelischen Kirchengemeinde Nidderbracht (`kirche-nidderbracht.ekhn.de`), Farbschema `purple`:
+
+- `#5c2583` — Primärfarbe (Dunkellila)
+- `#741cc0` — Sekundärfarbe (Mittellila)
+- `#e4cefa` — Akzent/Border (Helllila)
+- `#f2ecfa` — Hintergrund (Zierlila)
+
+### Technische Umsetzung
+
+1. `config.js` definiert pro Gebäude ein `theme`-Objekt mit den CSS-Variablen-Werten.
+2. Ein Inline-Script im `<head>` erkennt anhand des URL-Pfads das Gebäude und setzt die CSS-Variablen per `document.documentElement.style.setProperty()`.
+3. Das CSS (`app.css`) lädt danach mit den überschriebenen Werten.
+4. Kein Flash of wrong colors, da das Script vor dem CSS-Link ausgeführt wird.
+
+### Neues Gebäude hinzufügen
+
+1. In `config.js` neuen Eintrag in `buildings` mit `theme`-Objekt ergänzen.
+2. In `buildingIdByPath` den URL-Pfad-Mapping ergänzen.
+3. Farbwerte in der Tabelle oben dokumentieren.
+
 ## Navigation
 
 - Hauptnavigation: Großbuchstaben, Hover-Farbe `#6c0e15`.

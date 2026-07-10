@@ -11,6 +11,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+    <script src="assets/js/config.js"></script>
+    <script>
+      (function () {
+        var c = window.APP_CONFIG;
+        if (!c || !c.theme) return;
+        var t = c.theme;
+        var s = document.documentElement.style;
+        var m = {primary:'--color-primary',primaryDark:'--color-primary-dark',secondary:'--color-secondary',link:'--color-link',bgPage:'--color-bg-page',bgMuted:'--color-bg-muted',border:'--color-border',dark:'--color-dark'};
+        Object.keys(m).forEach(function(k){if(t[k])s.setProperty(m[k],t[k]);});
+        if(t.primary){var mc=document.querySelector('meta[name="theme-color"]');if(mc)mc.setAttribute('content',t.primary);}
+      })();
+    </script>
     <link rel="stylesheet" href="assets/css/app.css">
   </head>
   <body>
@@ -238,7 +250,6 @@
       </div>
     </footer>
 
-    <script src="assets/js/config.js"></script>
     <script src="assets/js/api.js"></script>
     <script src="assets/js/ui.js"></script>
     <script src="assets/js/app.js"></script>
