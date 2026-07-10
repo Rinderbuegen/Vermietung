@@ -7,8 +7,8 @@ Für ein zweites Gebäude wird die statische PWA kopiert oder als zweite GitHub-
 Alternativ können beide Gebäude über ein einziges GitHub-Pages-Repository laufen. Dann wird das Gebäude über feste Pfade ausgewählt:
 
 ```text
-https://<github-name>.github.io/<repo-name>/dgh-rb/
-https://<github-name>.github.io/<repo-name>/ev-gem-rb/
+https://Rinderbuegen.github.io/vermietung/DGH/
+https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
 ```
 
 Die GitHub-Action erzeugt diese Unterseiten automatisch aus derselben Codebasis. Ohne Pfad verwendet die App den Standardwert aus `assets/js/config.js`, aktuell `dgh_rb`.

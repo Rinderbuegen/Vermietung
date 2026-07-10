@@ -1,6 +1,6 @@
 # GitHub-Pages-Links Für Die Gebäude
 
-Die endgültigen Links hängen vom GitHub-Namen und vom Repository-Namen ab. Diese Namen kennt der Code nicht automatisch.
+Das Projekt liegt unter `https://github.com/Rinderbuegen/Vermietung` und wird als GitHub-Pages-Projektseite veröffentlicht.
 
 ## Empfohlen: Ein Repository, Zwei Feste Links
 
@@ -9,21 +9,14 @@ Die Nutzer sollen keinen URL-Parameter eintippen. Deshalb erzeugt die GitHub-Act
 GitHub-Pages-Basislink:
 
 ```text
-https://<github-name>.github.io/<repo-name>/
+https://Rinderbuegen.github.io/vermietung/
 ```
 
 Gebäudelinks:
 
 ```text
-https://<github-name>.github.io/<repo-name>/dgh-rb/
-https://<github-name>.github.io/<repo-name>/ev-gem-rb/
-```
-
-Beispiel:
-
-```text
-https://meinverein.github.io/gebaeudevermietung/dgh-rb/
-https://meinverein.github.io/gebaeudevermietung/ev-gem-rb/
+https://Rinderbuegen.github.io/vermietung/DGH/
+https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
 ```
 
 Vorteile:
@@ -38,43 +31,31 @@ Vorteile:
 Die App erkennt den Pfad:
 
 ```text
-/dgh-rb/    -> buildingId dgh_rb
-/ev-gem-rb/ -> buildingId ev_gem_rb
+/DGH/          -> buildingId dgh_rb
+/Gemeindehaus/ -> buildingId ev_gem_rb
 ```
 
-Die Datei `assets/js/config.js` enthält beide Gebäudekonfigurationen. Die GitHub-Action kopiert dieselbe App nach `dgh-rb/` und `ev-gem-rb/`.
+Die Datei `assets/js/config.js` enthält beide Gebäudekonfigurationen. Die GitHub-Action kopiert dieselbe App nach `DGH/` und `Gemeindehaus/`.
 
 Lokal kann dieselbe Ausgabe erzeugt werden:
 
 ```pwsh
 python scripts/build-content-index.py
 python scripts/build-pages-site.py
+python scripts/configure-runtime.py "https://script.google.com/macros/s/.../exec" _site
 python -m http.server 8080 --directory _site
 ```
 
 Danach testen:
 
 ```text
-http://localhost:8080/dgh-rb/
-http://localhost:8080/ev-gem-rb/
+http://localhost:8080/DGH/
+http://localhost:8080/Gemeindehaus/
 ```
 
-## Optional: Zwei Separate Repositories
+## GitHub-Konfiguration
 
-Nur sinnvoll, wenn später wirklich getrennte Deployments nötig sind.
-
-Empfohlene Repository-Namen:
-
-```text
-gebaeudevermietung-dgh-rb
-gebaeudevermietung-ev-gem-rb
-```
-
-Links:
-
-```text
-https://<github-name>.github.io/gebaeudevermietung-dgh-rb/
-https://<github-name>.github.io/gebaeudevermietung-ev-gem-rb/
-```
-
-Dann darf nicht manuell in beiden Repos entwickelt werden. Es braucht ein Haupt-Repo, das beide Pages-Repos automatisch befüllt. Für Version 1 ist das unnötig.
+- `Settings -> Pages -> Source`: `GitHub Actions`.
+- `Settings -> Secrets and variables -> Actions -> Variables`: `APPS_SCRIPT_WEB_APP_URL` mit der Apps-Script-Web-App-URL `/exec` anlegen.
+- Secrets sind für diese URL nicht nötig, weil sie im ausgelieferten statischen JavaScript öffentlich sichtbar ist.
+- Der Workflow nutzt keine weiteren Secrets.

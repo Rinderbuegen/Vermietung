@@ -25,8 +25,8 @@ window.APP_CONFIG = {
 
 (function () {
   const buildingIdByPath = {
-    "dgh-rb": "dgh_rb",
-    "ev-gem-rb": "ev_gem_rb"
+    DGH: "dgh_rb",
+    Gemeindehaus: "ev_gem_rb"
   };
   const config = window.APP_CONFIG;
   const pathParts = window.location.pathname.split("/").filter(Boolean);

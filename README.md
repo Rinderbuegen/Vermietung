@@ -2,6 +2,8 @@
 
 Kleine statische PWA für öffentliche Gebäudevermietung. Die App läuft ohne Node.js-Backend auf GitHub Pages und spricht eine Google-Apps-Script-Web-App an. Die Daten liegen in privaten Google Sheets.
 
+Repository: `https://github.com/Rinderbuegen/Vermietung`
+
 ## Architektur
 
 ```text
@@ -80,30 +82,37 @@ Siehe `docs/apps-script-deployment.md`.
 ## GitHub Pages
 
 Die App ist statisch. Die GitHub-Action `.github/workflows/pages.yml` erzeugt vor dem Deployment automatisch `assets/data/news.json` und `assets/data/downloads.json`.
-Außerdem erzeugt sie die festen Unterseiten `dgh-rb/` und `ev-gem-rb/`.
+Außerdem erzeugt sie die festen Unterseiten `DGH/` und `Gemeindehaus/`.
 
-Wenn beide Gebäude über ein einziges GitHub-Pages-Repository laufen, sind die Links:
-
-```text
-https://<github-name>.github.io/<repo-name>/dgh-rb/
-https://<github-name>.github.io/<repo-name>/ev-gem-rb/
-```
-
-Beispiel mit Platzhaltern:
+Produktive Links:
 
 ```text
-https://meinverein.github.io/gebaeudevermietung/dgh-rb/
-https://meinverein.github.io/gebaeudevermietung/ev-gem-rb/
+https://Rinderbuegen.github.io/vermietung/DGH/
+https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
 ```
 
 Der Code bleibt trotzdem nur einmal vorhanden. Die GitHub-Action erzeugt die zwei Unterseiten beim Deployment automatisch.
 
-Wenn jedes Gebäude später ein eigenes GitHub-Pages-Repository bekommt, sind sprechende Repo-Namen empfohlen:
+Vor dem ersten Deployment in GitHub konfigurieren:
 
 ```text
-https://<github-name>.github.io/gebaeudevermietung-dgh-rb/
-https://<github-name>.github.io/gebaeudevermietung-ev-gem-rb/
+Settings -> Pages -> Source: GitHub Actions
+Settings -> Secrets and variables -> Actions -> Variables:
+APPS_SCRIPT_WEB_APP_URL = https://script.google.com/macros/s/.../exec
 ```
+
+Die Apps-Script-Web-App-URL ist in der ausgelieferten statischen App öffentlich sichtbar. Deshalb ist eine Repository-Variable ausreichend; ein Secret schützt diesen Wert nach dem Deployment nicht.
+
+Lokal kann dieselbe Ausgabe erzeugt werden:
+
+```pwsh
+python scripts/build-content-index.py
+python scripts/build-pages-site.py
+python scripts/configure-runtime.py "https://script.google.com/macros/s/.../exec" _site
+python -m http.server 8080 --directory _site
+```
+
+Danach öffnen: `http://localhost:8080/DGH/` und `http://localhost:8080/Gemeindehaus/`.
 
 PDFs werden abgelegt unter:
 
