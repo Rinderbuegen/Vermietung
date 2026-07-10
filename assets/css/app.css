@@ -357,6 +357,11 @@ textarea { resize: vertical; }
 .site-footer a { color: white; text-decoration: none; }
 .site-footer a:hover { text-decoration: underline; }
 
+.footer-updated {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
 @media (max-width: 840px) {
   .header-grid,
   .footer-grid { align-items: flex-start; flex-direction: column; }
