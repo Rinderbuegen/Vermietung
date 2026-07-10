@@ -54,6 +54,44 @@
     return "";
   }
 
+  function setButtonLoading(button, isLoading, loadingText) {
+    if (!button) return;
+    if (isLoading) {
+      if (!button.dataset.originalHtml) {
+        button.dataset.originalHtml = button.innerHTML;
+      }
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner" aria-hidden="true"></span> ' + (loadingText || 'wird geladen …');
+    } else {
+      button.disabled = false;
+      button.innerHTML = button.dataset.originalHtml || 'Absenden';
+      delete button.dataset.originalHtml;
+    }
+  }
+
+  function setFormLoading(form, isLoading) {
+    if (!form) return;
+    const button = form.querySelector('button[type="submit"]');
+    const message = form.querySelector('.form-message');
+    if (!button) return;
+    if (isLoading) {
+      if (!button.dataset.originalHtml) {
+        button.dataset.originalHtml = button.innerHTML;
+      }
+      button.disabled = true;
+      button.innerHTML = '<span class="spinner" aria-hidden="true"></span> wird gesendet …';
+      if (message) {
+        const label = button.dataset.originalHtml.replace(/ senden$/, '');
+        message.textContent = label + ' wird gesendet …';
+        message.className = 'form-message';
+      }
+    } else {
+      button.disabled = false;
+      button.innerHTML = button.dataset.originalHtml || 'Absenden';
+      delete button.dataset.originalHtml;
+    }
+  }
+
   async function loadBuilding() {
     try {
       const building = await window.Api.getBuilding();
@@ -118,9 +156,17 @@
   }
 
   function bindForms() {
-    document.getElementById("occupancyFilter").addEventListener("submit", (event) => {
+    document.getElementById("occupancyFilter").addEventListener("submit", async (event) => {
       event.preventDefault();
-      loadOccupancy();
+      const button = event.currentTarget.querySelector('button[type="submit"]');
+      const meta = document.getElementById("occupancyMeta");
+      setButtonLoading(button, true, 'wird aktualisiert …');
+      if (meta) meta.textContent = 'Belegung wird aktualisiert …';
+      try {
+        await loadOccupancy();
+      } finally {
+        setButtonLoading(button, false);
+      }
     });
 
     document.getElementById("bookingForm").addEventListener("submit", async (event) => {
@@ -139,6 +185,7 @@
         message.className = "form-message is-error";
         return;
       }
+      setFormLoading(form, true);
       try {
         await window.Api.createBookingRequest(data);
         form.reset();
@@ -148,6 +195,8 @@
       } catch (requestError) {
         message.textContent = requestError.message;
         message.className = "form-message is-error";
+      } finally {
+        setFormLoading(form, false);
       }
     });
 
@@ -167,6 +216,7 @@
         message.className = "form-message is-error";
         return;
       }
+      setFormLoading(form, true);
       try {
         await window.Api.createContactRequest(data);
         form.reset();
@@ -175,6 +225,8 @@
       } catch (requestError) {
         message.textContent = requestError.message;
         message.className = "form-message is-error";
+      } finally {
+        setFormLoading(form, false);
       }
     });
   }

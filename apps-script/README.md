@@ -1,22 +1,54 @@
 # Apps Script
 
-`Code.gs` enthält die öffentliche API für die PWA und die Setup-Funktion für die finalen Google Sheets.
+Zwei getrennte Skripte für unterschiedliche Zwecke:
 
-## Setup
+## 1. Buchungs-API (`buchungs-api/Code.gs`)
 
-1. `Code.gs` in ein Google-Apps-Script-Projekt kopieren.
-2. `setupSheets()` einmal manuell ausführen.
-3. Betreiberwerte im Sheet prüfen.
-4. Als Web-App bereitstellen.
-5. Web-App-URL in `assets/js/config.js` eintragen.
+Öffentliche REST-API für die PWA. Läuft als **standalone Web App**.
 
-## Spreadsheet-Zuordnung
+Aufgaben:
+- `GET building` – Gebäudeinfo abrufen
+- `GET occupancy` – Belegungsdaten für den Kalender
+- `POST createBookingRequest` – neue Anfrage aus dem Formular speichern
+- `POST createContactRequest` – Kontaktanfrage speichern
+- E-Mail-Benachrichtigung an Betreiber bei neuen Anfragen
+- Tabellen-Struktur via `setupSheets()` anlegen
 
-```js
-dgh_rb    -> Dorfgemeinschaftshaus Rinderbügen, 11yws8ZxRB9U2oyeW8hwwC_WTR1AYLao4_iNkZEIwThc
-ev_gem_rb -> Evangelisches Gemeindehaus Rinderbügen, 1GaqxZtkEx_lByT1odJXkS4Rp80Kr4cuLwFWz32Ssq1E
-```
+**Einrichtung:**
 
-## Öffentliche Daten
+1. `buchungs-api/Code.gs` in ein neues Apps-Script-Projekt kopieren
+2. `setupSheets()` einmal manuell ausführen → legt Tabs an
+3. Betreiberwerte im Spreadsheet prüfen (Buildings, Settings)
+4. Als Web-App bereitstellen (Ausführen als: ich, Zugriff: Jeder)
+5. Web-App-URL als `APPS_SCRIPT_WEB_APP_URL` im GitHub-Secret hinterlegen
 
-Die API gibt keine personenbezogenen Request-Daten in `occupancy` oder `building` aus. Hinweise und Downloads laufen nicht über Apps Script, sondern als statische GitHub-Pages-Dateien.
+Spreadsheet-Zuordnung:
+
+| building_id | Spreadsheet-ID |
+|---|---|
+| `dgh_rb` | `11yws8ZxRB9U2oyeW8hwwC_WTR1AYLao4_iNkZEIwThc` |
+| `ev_gem_rb` | `1GaqxZtkEx_lByT1odJXkS4Rp80Kr4cuLwFWz32Ssq1E` |
+
+## 2. Buchungsverwaltung (`buchungsverwaltung/Code.gs`)
+
+Betreiber-Workflow für Google Sheets. Läuft als **gebundenes Script**
+direkt im Spreadsheet (Erweiterungen → Apps Script).
+
+Aufgaben:
+- Menü "Buchungen" mit Aktionen für eingehende Anfragen
+- "Anfrage bestätigen → Booking" legt Eintrag in Bookings an und sendet E-Mail
+- "Anfrage ablehnen" setzt Status auf rejected
+- "Zeitraum sperren" trägt blocked-Eintrag in Bookings ein
+
+**Einrichtung:**
+
+1. Spreadsheet öffnen → Erweiterungen → Apps Script
+2. `buchungsverwaltung/Code.gs` einfügen, speichern, Projektname vergeben
+3. Bei erster Menü-Nutzung Berechtigungen erteilen
+4. Spreadsheet neu laden → Menü "Buchungen" erscheint
+
+## Tabellen-Struktur
+
+Siehe `docs/google-sheet-struktur.md`. Beide Skripte nutzen dieselbe
+Tabellen-Struktur – die Buchungs-API legt sie an, die Buchungsverwaltung
+arbeitet darauf.
