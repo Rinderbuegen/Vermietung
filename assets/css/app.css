@@ -431,8 +431,10 @@ textarea { resize: vertical; }
 }
 
 .occupancy-day {
+  border: 0;
   display: grid;
   min-height: 34px;
+  padding: 0;
   place-items: center;
   color: #111;
   font-size: 0.9rem;
@@ -440,6 +442,7 @@ textarea { resize: vertical; }
 }
 
 .occupancy-day.is-free { background: #eeeeee; color: #444; }
+button.occupancy-day.is-free:hover { background: #e0e0e0; outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .occupancy-day.is-busy { background: var(--color-primary); color: #fff; }
 .occupancy-day.is-partial {
   background: linear-gradient(135deg, #eeeeee 0 50%, var(--color-primary) 50% 100%);

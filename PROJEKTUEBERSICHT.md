@@ -48,4 +48,4 @@ Version 1 ist bewusst klein gehalten. Normale Nutzer erzeugen nur offene Anfrage
 
 Desktop-Layout: Bei ausreichender Breite und Höhe bleiben Kopfbereich und Footer sichtbar; nur der Hauptbereich scrollt.
 
-Belegung: Nutzer können zwischen tabellarischer Liste und Belegungsplan wechseln. Angezeigt werden nur Einträge aus `Bookings`, keine offenen Anfragen aus `Requests`. Im Belegungsplan sind Tage als `frei`, `belegt` oder `teilweise belegt` markiert; ein Klick auf einen Monat zeigt genau diesen Monat tabellarisch.
+Belegung: Nutzer können zwischen tabellarischer Liste und Belegungsplan wechseln. Angezeigt werden nur Einträge aus `Bookings`, keine offenen Anfragen aus `Requests`. Im Belegungsplan sind Tage als `frei`, `belegt` oder `teilweise belegt` markiert; ein Klick auf einen Monat zeigt genau diesen Monat tabellarisch. Ein Klick auf einen freien Tag übernimmt das Datum als ganztägige Buchungsanfrage und fokussiert das Namensfeld.

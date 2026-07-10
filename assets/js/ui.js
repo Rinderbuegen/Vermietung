@@ -135,6 +135,10 @@
       const status = dayStatus(itemsByDate.get(date) || []);
       const statusLabel = status === "busy" ? "belegt" : status === "partial" ? "teilweise belegt" : "frei";
       const dayLabel = dateFormatter.format(new Date(`${date}T00:00:00`));
+      if (status === "free") {
+        cells.push(`<button class="occupancy-day is-free" type="button" data-booking-date="${date}" title="Buchungsanfrage für ${escapeHtml(dayLabel)}" aria-label="${escapeHtml(dayLabel)}: frei, Buchungsanfrage starten">${day}</button>`);
+        continue;
+      }
       cells.push(`<span class="occupancy-day is-${status}" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(dayLabel)}: ${escapeHtml(statusLabel)}">${day}</span>`);
     }
 

@@ -177,6 +177,20 @@
     }
   }
 
+  function prefillBookingRequest(date) {
+    const form = document.getElementById("bookingForm");
+    const message = document.getElementById("bookingMessage");
+    form.elements.date.value = date;
+    form.elements.allDay.value = "true";
+    form.elements.allDay.dispatchEvent(new Event("change"));
+    if (message) {
+      message.textContent = "Datum wurde aus dem Belegungsplan übernommen.";
+      message.className = "form-message";
+    }
+    form.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => form.elements.requesterName.focus({ preventScroll: true }), 350);
+  }
+
   async function loadNews() {
     try {
       const data = await window.Api.getNews();
@@ -222,6 +236,12 @@
     });
 
     document.getElementById("occupancyList").addEventListener("click", async (event) => {
+      const dayButton = event.target.closest("[data-booking-date]");
+      if (dayButton) {
+        prefillBookingRequest(dayButton.dataset.bookingDate);
+        return;
+      }
+
       const button = event.target.closest("[data-occupancy-month]");
       if (!button) return;
       const select = document.getElementById("occupancyRange");
