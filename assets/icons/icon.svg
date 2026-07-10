@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Gebäudevermietung">
-  <rect width="512" height="512" rx="96" fill="#254f6e"/>
-  <path fill="#f7f5f0" d="M120 392h272v-28h-24V184l-112-64-112 64v180h-24v28Zm72-28V212l64-36 64 36v152h-36v-80h-56v80h-36Zm-20-192h168l-84-48-84 48Z"/>
-  <path fill="#b7791f" d="M220 236h72v28h-72z"/>
+  <rect width="512" height="512" rx="0" fill="#6c0e15"/>
+  <path fill="#ffffff" d="M120 392h272v-28h-24V184l-112-64-112 64v180h-24v28Zm72-28V212l64-36 64 36v152h-36v-80h-56v80h-36Zm-20-192h168l-84-48-84 48Z"/>
+  <path fill="#872323" d="M220 236h72v28h-72z"/>
 </svg>
