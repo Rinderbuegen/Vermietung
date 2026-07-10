@@ -4,7 +4,7 @@ window.APP_CONFIG = {
   buildingName: "Dorfgemeinschaftshaus Rinderbügen",
   operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
   contactEmail: "kontakt@example.com",
-  apiBaseUrl: "https://script.google.com/macros/s/AKfycbwAeT8iPrYmPPIqb4Cr8-dV86ptoqgGi-vKK2Diw7ZyDaqdgitxQTLEipCAfr5uYEx3OQ/exec",
+  apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
   showPendingRequestsInOccupancy: true,
   publicShowBookingTitles: false,
   buildings: {

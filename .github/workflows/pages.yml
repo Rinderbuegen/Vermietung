@@ -29,10 +29,10 @@ jobs:
       - run: python scripts/build-pages-site.py
       - name: Configure runtime
         env:
-          APPS_SCRIPT_WEB_APP_URL: ${{ vars.APPS_SCRIPT_WEB_APP_URL }}
+          APPS_SCRIPT_WEB_APP_URL: ${{ secrets.APPS_SCRIPT_WEB_APP_URL }}
         run: |
           if [ -z "$APPS_SCRIPT_WEB_APP_URL" ]; then
-            echo "::error::Repository variable APPS_SCRIPT_WEB_APP_URL fehlt."
+            echo "::error::Secret APPS_SCRIPT_WEB_APP_URL fehlt."
             exit 1
           fi
           python scripts/configure-runtime.py "$APPS_SCRIPT_WEB_APP_URL" _site

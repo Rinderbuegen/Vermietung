@@ -56,6 +56,6 @@ http://localhost:8080/Gemeindehaus/
 ## GitHub-Konfiguration
 
 - `Settings -> Pages -> Source`: `GitHub Actions`.
-- `Settings -> Secrets and variables -> Actions -> Variables`: `APPS_SCRIPT_WEB_APP_URL` mit der Apps-Script-Web-App-URL `/exec` anlegen.
-- Secrets sind für diese URL nicht nötig, weil sie im ausgelieferten statischen JavaScript öffentlich sichtbar ist.
+- `Settings -> Secrets and variables -> Actions -> Secrets`: `APPS_SCRIPT_WEB_APP_URL` mit der Apps-Script-Web-App-URL `/exec` anlegen.
+- Das Secret verhindert nur, dass die URL im öffentlichen Repository steht. Im ausgelieferten JavaScript ist sie weiter sichtbar.
 - Der Workflow nutzt keine weiteren Secrets.

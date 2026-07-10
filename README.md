@@ -97,11 +97,11 @@ Vor dem ersten Deployment in GitHub konfigurieren:
 
 ```text
 Settings -> Pages -> Source: GitHub Actions
-Settings -> Secrets and variables -> Actions -> Variables:
+Settings -> Secrets and variables -> Actions -> Secrets:
 APPS_SCRIPT_WEB_APP_URL = https://script.google.com/macros/s/.../exec
 ```
 
-Die Apps-Script-Web-App-URL ist in der ausgelieferten statischen App öffentlich sichtbar. Deshalb ist eine Repository-Variable ausreichend; ein Secret schützt diesen Wert nach dem Deployment nicht.
+Die Apps-Script-Web-App-URL ist in der ausgelieferten statischen App öffentlich sichtbar. Das Secret verhindert nur, dass die URL im öffentlichen Repository steht.
 
 Lokal kann dieselbe Ausgabe erzeugt werden:
 
