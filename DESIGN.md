@@ -78,7 +78,7 @@ font-family: 'Open Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe U
 
 ## Layout
 
-- Standard-Wrapper: 1330px
+- Standard-Wrapper: 1000px
 - Header-Bereich: 1590px (volle Breite)
 - Footer-Bereich: 1840px (volle Breite)
 - Volle Breite als Option verfügbar (`pagewidth-full`)
