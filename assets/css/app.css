@@ -311,18 +311,10 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
 .panel { padding: clamp(20px, 4vw, 32px); }
 
 .section-head {
-  position: sticky;
-  top: 94px;
   padding-left: clamp(16px, 3vw, 48px);
   max-width: 720px;
 }
 .section-head p { color: var(--color-text); }
-
-@media (min-width: 841px) and (min-height: 560px) {
-  .section-head {
-    top: clamp(16px, 3vw, 32px);
-  }
-}
 
 .filter-bar,
 .form-grid {
