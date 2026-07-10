@@ -36,6 +36,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 a { color: var(--color-link); text-decoration: underline; }
@@ -96,7 +97,7 @@ button { cursor: pointer; }
   color: #fff;
 }
 
-.brand > span {
+.brand > span:not(.brand-mark) {
   display: flex;
   flex-direction: column;
 }
