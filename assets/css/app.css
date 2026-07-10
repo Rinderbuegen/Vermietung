@@ -396,7 +396,6 @@ textarea { resize: vertical; }
 .status-label { background: var(--color-bg-muted); }
 .status-confirmed .status-label { background: var(--color-primary); color: #fff; }
 .status-blocked .status-label { background: var(--color-error); color: #fff; }
-.status-requested .status-label { background: var(--color-warning); color: #fff; }
 
 .occupancy-plan {
   display: grid;
@@ -440,11 +439,15 @@ textarea { resize: vertical; }
   font-weight: 700;
 }
 
-.occupancy-day.is-free { background: var(--color-success); }
-.occupancy-day.is-busy { background: #d8d8d8; color: #444; }
-.occupancy-day.is-partial { background: var(--color-warning); }
+.occupancy-day.is-free { background: #eeeeee; color: #444; }
+.occupancy-day.is-busy { background: var(--color-primary); color: #fff; }
+.occupancy-day.is-partial {
+  background: linear-gradient(135deg, #eeeeee 0 50%, var(--color-primary) 50% 100%);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
 .occupancy-day.is-empty { background: transparent; }
-.occupancy-day.is-out-of-range { background: #f0f0f0; color: #555; }
+.occupancy-day.is-out-of-range { background: transparent; color: #777; font-weight: 600; }
 
 .occupancy-legend {
   display: flex;
@@ -466,9 +469,9 @@ textarea { resize: vertical; }
   display: inline-block;
 }
 
-.occupancy-legend .is-free { background: var(--color-success); }
-.occupancy-legend .is-busy { background: #d8d8d8; }
-.occupancy-legend .is-partial { background: var(--color-warning); }
+.occupancy-legend .is-free { background: #eeeeee; border: 1px solid var(--color-border); }
+.occupancy-legend .is-busy { background: var(--color-primary); }
+.occupancy-legend .is-partial { background: linear-gradient(135deg, #eeeeee 0 50%, var(--color-primary) 50% 100%); }
 
 .empty {
   margin: 0;

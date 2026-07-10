@@ -18,7 +18,6 @@ Datei: `config/config.js`
 ```js
 window.APP_CONFIG = {
   apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
-  showPendingRequestsInOccupancy: true,
   publicShowBookingTitles: false
 };
 
@@ -90,6 +89,8 @@ Siehe `docs/github-content.md`.
 ## Belegung Pflegen
 
 Bestätigte Buchungen und Sperrzeiten werden in `Bookings` gepflegt.
+
+Die öffentliche Belegung zeigt ausschließlich Einträge aus `Bookings`. Offene Buchungsanfragen aus `Requests` werden weder tabellarisch noch im Belegungsplan angezeigt.
 
 Ganzer Tag:
 

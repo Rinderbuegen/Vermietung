@@ -61,6 +61,10 @@
     window.Ui.renderOccupancy(payload.items || [], payload.loadedAt, false);
   }
 
+  function bookingItems(items) {
+    return (items || []).filter((item) => item.statusKey !== "requested");
+  }
+
   function formData(form) {
     return Object.fromEntries(new FormData(form).entries());
   }
@@ -148,7 +152,7 @@
     const range = rangeFromSelection(select.value);
     try {
       const data = await window.Api.getOccupancy(range.from, range.to);
-      const payload = { items: data.items || [], loadedAt: data.loadedAt || new Date().toISOString() };
+      const payload = { items: bookingItems(data.items), loadedAt: data.loadedAt || new Date().toISOString() };
       currentOccupancyPayload = payload;
       currentOccupancyRange = range;
       localStorage.setItem(occupancyCacheKey(range), JSON.stringify(payload));
@@ -157,6 +161,7 @@
       const cached = localStorage.getItem(occupancyCacheKey(range));
       if (cached) {
         const payload = JSON.parse(cached);
+        payload.items = bookingItems(payload.items);
         currentOccupancyPayload = payload;
         currentOccupancyRange = range;
         if (selectedView() === "plan") {

@@ -122,9 +122,10 @@ Weiße Karte mitrand und Schatten:
 ### Statusanzeigen
 
 ```css
-.booking-vacant  { background-color: #23aa23; color: #fff; } /* belegt/verfügbar */
-.booking-short   { background-color: #c88700; color: #fff; } /* knapp */
-.booking-reserved { background-color: #c20000; color: #fff; } /* gesperrt/reserviert */
+.booking-confirmed { background-color: #6c0e15; color: #fff; } /* belegt */
+.booking-partial   { background: linear-gradient(135deg, #eee 0 50%, #6c0e15 50% 100%); } /* teilweise belegt */
+.booking-free      { background-color: #eee; color: #444; }    /* frei */
+.booking-blocked   { background-color: #c20000; color: #fff; } /* gesperrt */
 .booking-expired { background-color: #bbb; color: #fff; }    /* abgelaufen */
 ```
 
@@ -136,9 +137,10 @@ Weiße Karte mitrand und Schatten:
 
 ## Statusfarben
 
-- `belegt`: grün (`#23aa23`), bestätigt.
+- `frei`: hellgrau (`#eee`).
+- `belegt`: Primärfarbe des Gebäudes, wie der Tabellen-Badge für bestätigte Belegung.
+- `teilweise belegt`: diagonal geteilt, oben hellgrau wie frei, unten Primärfarbe wie belegt.
 - `gesperrt`: rot (`#c20000`), nicht verfügbar.
-- `angefragt`: gelb/orange (`#c88700`), noch nicht bestätigt.
 - `abgelaufen`: grau (`#bbb`), nicht mehr gültig.
 
 ## Per-Gebäude-Design

@@ -55,7 +55,6 @@ building_id | key | value
 Wichtige Schlüssel:
 
 - `public_show_booking_titles`: `true` oder `false`
-- `show_pending_requests_in_occupancy`: `true` oder `false`
 - `notify_email`: Betreiberadresse für Benachrichtigungen
 - `sheet_url`: Link zum Sheet für Benachrichtigungs-E-Mails
 

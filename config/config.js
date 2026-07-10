@@ -1,6 +1,5 @@
 window.APP_CONFIG = {
   apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
-  showPendingRequestsInOccupancy: true,
   publicShowBookingTitles: false
 };
 

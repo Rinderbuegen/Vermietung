@@ -14,8 +14,7 @@ const SHEET_HEADERS = {
 
 const STATUS_LABELS = {
   confirmed: "belegt",
-  blocked: "gesperrt",
-  requested: "angefragt"
+  blocked: "gesperrt"
 };
 
 function doGet(e) {
@@ -89,26 +88,13 @@ function getOccupancy(buildingId, from, to) {
   const range = normalizeDateRange(from, to);
   const settings = getSettings(buildingId);
   const showTitles = String(settings.public_show_booking_titles || "false") === "true";
-  const showPending = String(settings.show_pending_requests_in_occupancy || "true") !== "false";
   const bookings = readRows(buildingId, "Bookings")
     .filter((row) => row.building_id === buildingId && ["confirmed", "blocked"].includes(row.status))
     .filter((row) => dateInRange(row.date, range.from, range.to))
     .map((row) => publicOccupancyRow(row, showTitles));
-  const requests = showPending ? readRows(buildingId, "Requests")
-    .filter((row) => row.building_id === buildingId && ["open", "open_with_conflict"].includes(row.status))
-    .filter((row) => dateInRange(row.date, range.from, range.to))
-    .map((row) => ({
-      date: row.date,
-      from: normalizeTime(row.from),
-      to: normalizeTime(row.to),
-      allDay: isAllDay(row.from, row.to),
-      status: STATUS_LABELS.requested,
-      statusKey: "requested",
-      publicTitle: showTitles ? sanitizeText(row.title, 140) : ""
-    })) : [];
   return {
     loadedAt: new Date().toISOString(),
-    items: bookings.concat(requests).sort(sortByDateAndTime)
+    items: bookings.sort(sortByDateAndTime)
   };
 }
 

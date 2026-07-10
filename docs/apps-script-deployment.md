@@ -80,7 +80,6 @@ Diese Werte prüfen:
 ```text
 notify_email
 public_show_booking_titles
-show_pending_requests_in_occupancy
 sheet_url
 ```
 
@@ -88,7 +87,6 @@ Empfehlung für den Start:
 
 ```text
 public_show_booking_titles = false
-show_pending_requests_in_occupancy = true
 ```
 
 `notify_email` ist die Adresse, an die neue Buchungsanfragen gesendet werden.
