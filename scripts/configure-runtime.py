@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+import re
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -11,6 +12,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_FILE = ROOT / "assets" / "js" / "config.js"
 PLACEHOLDER_URL = "https://script.google.com/macros/s/DEPLOYMENT_ID/exec"
+API_BASE_URL_PATTERN = re.compile(r'(apiBaseUrl:\s*")[^"]+(")')
 
 
 def validate_apps_script_url(value: str) -> str:
@@ -39,9 +41,13 @@ def main() -> None:
 
     for config_file in config_files:
         content = config_file.read_text(encoding="utf-8")
-        if PLACEHOLDER_URL not in content:
-            raise SystemExit(f"Platzhalter nicht gefunden: {config_file}")
-        config_file.write_text(content.replace(PLACEHOLDER_URL, apps_script_url), encoding="utf-8")
+        if PLACEHOLDER_URL in content:
+            updated = content.replace(PLACEHOLDER_URL, apps_script_url)
+        else:
+            updated, count = API_BASE_URL_PATTERN.subn(rf"\g<1>{apps_script_url}\2", content, count=1)
+            if count != 1:
+                raise SystemExit(f"apiBaseUrl nicht gefunden: {config_file}")
+        config_file.write_text(updated, encoding="utf-8")
 
 
 if __name__ == "__main__":
