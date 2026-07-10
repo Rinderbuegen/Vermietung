@@ -13,9 +13,11 @@ downloads/
 
 Dateien in `common/` gelten für alle Gebäude.
 
-## Dateityp
+## Dateitypen
 
-Nur **PDF** wird erkannt. Andere Formate werden ignoriert.
+**Erkannt und angezeigt:** PDF
+
+**Erlaubt, aber nicht direkt angezeigt:** Andere Dateiformate wie `.odt`, `.docx`, `.xlsx` etc. dürfen im Verzeichnis abgelegt werden. Die Anwendung erkennt sie nicht — sie dienen als Quelldateien. Der Anwender muss sie manuell als PDF exportieren, bevor sie in der App erscheinen.
 
 ## Dateibenennung
 

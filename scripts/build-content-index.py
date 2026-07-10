@@ -75,6 +75,8 @@ def scan_downloads() -> list[dict]:
     if not DOWNLOADS_DIR.exists():
         return items
     for path in sorted(DOWNLOADS_DIR.rglob("*.pdf")):
+        if path.parent == DOWNLOADS_DIR:
+            continue
         data = path.read_bytes()
         title = pdf_info_value(data, "Title") or path.stem.replace("-", " ").replace("_", " ")
         description = pdf_info_value(data, "Subject") or pdf_info_value(data, "Keywords")
@@ -115,6 +117,8 @@ def scan_news() -> list[dict]:
     if not NEWS_DIR.exists():
         return items
     for path in sorted(NEWS_DIR.rglob("*.md")):
+        if path.parent == NEWS_DIR:
+            continue
         meta, body = parse_frontmatter(path.read_text(encoding="utf-8"))
         building_id = str(meta.get("building_id") or meta.get("buildingId") or building_id_for(path, NEWS_DIR))
         active = meta.get("active", True)

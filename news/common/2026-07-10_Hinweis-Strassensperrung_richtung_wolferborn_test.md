@@ -8,7 +8,6 @@ valid_until: 2026-09-01
 sort_order: 1
 ---
 
-# Ab 1.8. Einschränkung der Anfahrt nach Rinderbügen (Testbericht)
 Die Zufahrtstraße zwischen Wolferborn und Rinderbügen wird mit einem Radweg modernisiert. Es ist mit zeitweiligen Vollsperrungen der Straße zu rechnen. Dies bedeutet, Rinderbügen ist in dieser Zeit nur über die Anfahrt aus Büdingen zu erreichen.
 
 Die Feldstraßen von Michelau und von Leisenwald sind nicht für den Verkehr freigegeben und das Ordnungsamt kontrolliert hier streng.

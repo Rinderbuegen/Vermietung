@@ -1,4 +1,13 @@
 {
-  "generatedAt": "2026-07-09T23:00:27.973698Z",
-  "items": []
+  "generatedAt": "2026-07-10T12:04:31.568204Z",
+  "items": [
+    {
+      "buildingId": "ev_gem_rb",
+      "title": "Hausordnung",
+      "description": "",
+      "url": "downloads/ev_gem_rb/Hausordnung.pdf",
+      "date": "",
+      "updatedAt": "2026-07-10T11:56:32.481079Z"
+    }
+  ]
 }

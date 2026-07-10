@@ -1,4 +1,31 @@
 {
-  "generatedAt": "2026-07-09T23:00:27.974210Z",
-  "items": []
+  "generatedAt": "2026-07-10T12:04:31.569852Z",
+  "items": [
+    {
+      "buildingId": "dgh_rb",
+      "date": "2026-07-10",
+      "title": "Ab 1.8. Einschränkung Anfahrt Rinderbügen (Test)",
+      "body": "# Ab 1.8. Einschränkung der Anfahrt nach Rinderbügen (Testbericht)\nDie Zufahrtstraße zwischen Wolferborn und Rinderbügen wird mit einem Radweg modernisiert. Es ist mit zeitweiligen Vollsperrungen der Straße zu rechnen. Dies bedeutet, Rinderbügen ist in dieser Zeit nur über die Anfahrt aus Büdingen zu erreichen.\n\nDie Feldstraßen von Michelau und von Leisenwald sind nicht für den Verkehr freigegeben und das Ordnungsamt kontrolliert hier streng.\n\nBitte beachten sie auch die Hinweise auf die aktuelle Sperrungen beim Baustellenbetreiber Hessen Mobil.  https://mobil.hessen.de/Themen-A-Z/baustellen",
+      "type": "warnung",
+      "active": true,
+      "validFrom": "2026-07-01",
+      "validUntil": "2026-09-01",
+      "sortOrder": "1",
+      "url": "news/dgh_rb/2026-07-10_Hinweis-Strassensperrung_richtung_wolferborn_test.md",
+      "updatedAt": "2026-07-10T11:49:34.367267Z"
+    },
+    {
+      "buildingId": "ev_gem_rb",
+      "date": "2026-07-10",
+      "title": "Ab 1.8. Einschränkung Anfahrt Rinderbügen (Test)",
+      "body": "# Ab 1.8. Einschränkung der Anfahrt nach Rinderbügen (Testbericht)\nDie Zufahrtstraße zwischen Wolferborn und Rinderbügen wird mit einem Radweg modernisiert. Es ist mit zeitweiligen Vollsperrungen der Straße zu rechnen. Dies bedeutet, Rinderbügen ist in dieser Zeit nur über die Anfahrt aus Büdingen zu erreichen.\n\nDie Feldstraßen von Michelau und von Leisenwald sind nicht für den Verkehr freigegeben und das Ordnungsamt kontrolliert hier streng.\n\nBitte beachten sie auch die Hinweise auf die aktuelle Sperrungen beim Baustellenbetreiber Hessen Mobil.  https://mobil.hessen.de/Themen-A-Z/baustellen",
+      "type": "warnung",
+      "active": true,
+      "validFrom": "2026-07-01",
+      "validUntil": "2026-09-01",
+      "sortOrder": "1",
+      "url": "news/ev_gem_rb/2026-07-10_Hinweis-Strassensperrung_richtung_wolferborn_test.md",
+      "updatedAt": "2026-07-10T11:49:34.367267Z"
+    }
+  ]
 }
