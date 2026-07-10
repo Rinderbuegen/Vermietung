@@ -59,3 +59,8 @@ http://localhost:8080/Gemeindehaus/
 - `Settings -> Secrets and variables -> Actions -> Secrets`: `APPS_SCRIPT_WEB_APP_URL` mit der Apps-Script-Web-App-URL `/exec` anlegen.
 - Das Secret verhindert nur, dass die URL im öffentlichen Repository steht. Im ausgelieferten JavaScript ist sie weiter sichtbar.
 - Der Workflow nutzt keine weiteren Secrets.
+- 1. Repo öffnen: https://github.com/Rinderbuegen/Vermietung
+  2. Settings -> Pages
+  3. Bei Build and deployment
+  4. Source: GitHub Actions
+  5. Speichern
