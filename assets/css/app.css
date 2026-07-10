@@ -217,6 +217,10 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
   margin-top: 24px;
 }
 
+.hero-actions .button {
+  flex: 1 1 200px;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -340,7 +344,7 @@ textarea { resize: vertical; }
 .status-pill { background: var(--color-bg-muted); color: var(--color-primary); }
 .status-pill.is-offline { background: #fff0d2; color: var(--color-warning); }
 .status-label { background: var(--color-bg-muted); }
-.status-confirmed .status-label { background: var(--color-success); color: #fff; }
+.status-confirmed .status-label { background: var(--color-primary); color: #fff; }
 .status-blocked .status-label { background: var(--color-error); color: #fff; }
 .status-requested .status-label { background: var(--color-warning); color: #fff; }
 
