@@ -13,12 +13,6 @@
     return iso(new Date());
   }
 
-  function addDays(date, days) {
-    const copy = new Date(date);
-    copy.setDate(copy.getDate() + days);
-    return copy;
-  }
-
   function iso(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   }
@@ -36,10 +30,10 @@
     const now = new Date();
     const year = now.getFullYear();
     if (value === "today") return { from: todayIso(), to: todayIso() };
-    if (value === "four-weeks") return { from: todayIso(), to: iso(addDays(now, 28)) };
+    if (value === "next-month") return { from: todayIso(), to: iso(new Date(year, now.getMonth() + 2, 0)) };
     if (value === "year") return clampRange({ from: `${year}-01-01`, to: `${year}-12-31` });
     if (value === "next-year") return { from: `${year + 1}-01-01`, to: `${year + 1}-12-31` };
-    return { from: todayIso(), to: iso(addDays(now, 7)) };
+    return { from: todayIso(), to: iso(new Date(year, now.getMonth() + 2, 0)) };
   }
 
   function monthRange(month) {
@@ -50,7 +44,7 @@
 
   function selectedView() {
     const select = document.getElementById("occupancyView");
-    return select ? select.value : "table";
+    return select ? select.value : "plan";
   }
 
   function renderOccupancy(payload, range) {
