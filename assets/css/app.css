@@ -33,6 +33,9 @@ body {
   color: var(--color-text);
   background: var(--color-bg-page);
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 a { color: var(--color-link); text-decoration: underline; }
@@ -93,6 +96,11 @@ button { cursor: pointer; }
   color: #fff;
 }
 
+.brand > span {
+  display: flex;
+  flex-direction: column;
+}
+
 .brand-mark {
   display: grid;
   width: 42px;
@@ -133,6 +141,10 @@ button { cursor: pointer; }
 }
 
 .main-nav a:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+main {
+  flex: 1;
+}
 
 .section { padding-block: clamp(48px, 8vw, 86px); }
 .section:last-of-type { padding-bottom: 60px; }
