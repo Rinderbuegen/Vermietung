@@ -29,11 +29,11 @@
     }
     const now = new Date();
     const year = now.getFullYear();
-    if (value === "today") return { from: todayIso(), to: todayIso() };
+    if (value === "current-month") return { from: todayIso(), to: iso(new Date(year, now.getMonth() + 1, 0)) };
     if (value === "next-month") return { from: todayIso(), to: iso(new Date(year, now.getMonth() + 2, 0)) };
     if (value === "year") return clampRange({ from: `${year}-01-01`, to: `${year}-12-31` });
     if (value === "next-year") return { from: `${year + 1}-01-01`, to: `${year + 1}-12-31` };
-    return { from: todayIso(), to: iso(new Date(year, now.getMonth() + 2, 0)) };
+    return { from: todayIso(), to: iso(new Date(year, now.getMonth() + 1, 0)) };
   }
 
   function monthRange(month) {
