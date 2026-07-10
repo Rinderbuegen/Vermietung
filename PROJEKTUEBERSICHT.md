@@ -27,7 +27,7 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 ## Wichtige Dateien
 
 - `index.html`: App-Oberfläche.
-- `assets/js/config.js`: Betreiber-/Gebäudekonfiguration.
+- `assets/js/config.js`: Betreiber-/Gebäudekonfiguration inklusive Hero-Titel und Ort.
 - `assets/js/api.js`: API-Zugriff auf Apps Script.
 - `assets/js/app.js`: App-Logik und Formularverarbeitung.
 - `assets/js/ui.js`: Rendering-Helfer.

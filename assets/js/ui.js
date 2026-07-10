@@ -103,6 +103,8 @@
   function applyConfig(config) {
     text("[data-app-title]", config.appTitle || "Gebäudevermietung");
     text("[data-building-name]", config.buildingName || config.appTitle || "Gebäude");
+    text("[data-hero-title]", config.heroTitle || config.buildingName || config.appTitle || "Gebäude");
+    text("[data-hero-location]", config.heroLocation || "");
     text("[data-operator-name]", config.operatorName || "Betreiber");
     setLink("[data-contact-email]", `mailto:${config.contactEmail || ""}`, config.contactEmail || "Kontakt nicht hinterlegt");
     document.querySelectorAll("[data-building-id-field]").forEach((field) => {

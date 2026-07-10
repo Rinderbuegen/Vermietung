@@ -2,6 +2,8 @@ window.APP_CONFIG = {
   buildingId: "dgh_rb",
   appTitle: "Vermietung Dorfgemeinschaftshaus Rinderbügen",
   buildingName: "Dorfgemeinschaftshaus Rinderbügen",
+  heroTitle: "Dorfgemeinschaftshaus",
+  heroLocation: "Rinderbügen",
   operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
   contactEmail: "kontakt@example.com",
   apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
@@ -11,12 +13,16 @@ window.APP_CONFIG = {
     dgh_rb: {
       appTitle: "Vermietung Dorfgemeinschaftshaus Rinderbügen",
       buildingName: "Dorfgemeinschaftshaus Rinderbügen",
+      heroTitle: "Dorfgemeinschaftshaus",
+      heroLocation: "Rinderbügen",
       operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
       contactEmail: "kontakt@example.com"
     },
     ev_gem_rb: {
       appTitle: "Vermietung Evangelisches Gemeindehaus Rinderbügen",
       buildingName: "Evangelisches Gemeindehaus Rinderbügen",
+      heroTitle: "Evangelisches Gemeindehaus",
+      heroLocation: "Rinderbügen",
       operatorName: "Betreiber Evangelisches Gemeindehaus Rinderbügen",
       contactEmail: "kontakt@example.com"
     }
