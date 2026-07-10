@@ -35,7 +35,7 @@ Die App erkennt den Pfad:
 /Gemeindehaus/ -> buildingId ev_gem_rb
 ```
 
-Die Datei `assets/js/config.js` enthält beide Gebäudekonfigurationen. Die GitHub-Action kopiert dieselbe App nach `DGH/` und `Gemeindehaus/`.
+Die globale Datei `config/config.js` enthält gemeinsame Werte. Gebäudespezifische Werte stehen getrennt in `config/DGH/config.js` und `config/Gemeindehaus/config.js`. Die GitHub-Action kopiert dieselbe App nach `DGH/` und `Gemeindehaus/`.
 
 Lokal kann dieselbe Ausgabe erzeugt werden:
 

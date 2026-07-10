@@ -143,7 +143,7 @@ Weiße Karte mitrand und Schatten:
 
 ## Per-Gebäude-Design
 
-Jedes Gebäude hat eigene Farben, die per `config.js` → `theme` definiert und vor dem CSS-Laden als CSS-Variablen injiziert werden. Layout und Typografie bleiben gleich.
+Jedes Gebäude hat eigene Farben, die in `config/<Gebäude>/config.js` unter `theme` definiert und vor dem CSS-Laden als CSS-Variablen injiziert werden. Layout und Typografie bleiben gleich.
 
 ### Farbzuordnung
 
@@ -169,15 +169,16 @@ Farben entnommen aus dem Designsystem der Evangelischen Kirchengemeinde Nidderbr
 
 ### Technische Umsetzung
 
-1. `config.js` definiert pro Gebäude ein `theme`-Objekt mit den CSS-Variablen-Werten.
-2. Ein Inline-Script im `<head>` erkennt anhand des URL-Pfads das Gebäude und setzt die CSS-Variablen per `document.documentElement.style.setProperty()`.
-3. Das CSS (`app.css`) lädt danach mit den überschriebenen Werten.
-4. Kein Flash of wrong colors, da das Script vor dem CSS-Link ausgeführt wird.
+1. `config/config.js` definiert gemeinsame Werte und das URL-Pfad-Mapping.
+2. `config/<Gebäude>/config.js` definiert pro Gebäude ein `theme`-Objekt mit den CSS-Variablen-Werten.
+3. Ein Inline-Script im `<head>` lädt anhand des URL-Pfads die passende Gebäudekonfiguration und setzt die CSS-Variablen per `document.documentElement.style.setProperty()`.
+4. Das CSS (`app.css`) lädt danach mit den überschriebenen Werten.
+5. Kein Flash of wrong colors, da die Konfiguration vor dem CSS-Link geladen wird.
 
 ### Neues Gebäude hinzufügen
 
-1. In `config.js` neuen Eintrag in `buildings` mit `theme`-Objekt ergänzen.
-2. In `buildingIdByPath` den URL-Pfad-Mapping ergänzen.
+1. Neues Verzeichnis `config/<Gebäude>/` mit eigener `config.js` anlegen.
+2. In `config/config.js` das URL-Pfad-Mapping in `buildingIdByPath` ergänzen.
 3. Farbwerte in der Tabelle oben dokumentieren.
 
 ## Navigation

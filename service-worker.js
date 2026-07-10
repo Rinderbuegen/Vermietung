@@ -1,8 +1,11 @@
-const CACHE_NAME = "vermietung-v5";
+const CACHE_NAME = "vermietung-v6";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
+  "./config/config.js",
+  "./config/DGH/config.js",
+  "./config/Gemeindehaus/config.js",
   "./assets/icons/icon.svg",
   "./assets/css/app.css",
   "./assets/js/api.js",

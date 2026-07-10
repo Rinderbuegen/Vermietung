@@ -8,7 +8,7 @@ Diese Anleitung richtet sich an Personen, die Google Apps Script noch nicht genu
 - `Apps Script`: kleines Google-Script, das zwischen PWA und Sheets sitzt.
 - `Web-App`: öffentlich erreichbare URL des Apps Scripts.
 - `setupSheets()`: Hilfsfunktion, die Tabs und Kopfzeilen in den zwei Sheets anlegt.
-- `Deployment-URL`: URL, die später in `assets/js/config.js` eingetragen wird.
+- `Deployment-URL`: URL, die später in `config/config.js` eingetragen wird.
 
 ## Vorhandene Sheets
 
@@ -145,7 +145,7 @@ Wenn `ok` auf `false` steht, die Fehlermeldung lesen. Häufige Ursachen:
 Datei öffnen:
 
 ```text
-assets/js/config.js
+config/config.js
 ```
 
 Diesen Wert ersetzen:

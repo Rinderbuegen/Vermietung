@@ -10,6 +10,8 @@ building_id | name | operator_name | contact_email | active | public_note
 
 `active` muss `true` sein, damit das Gebäude über die API nutzbar ist.
 
+Sichtbare UI-Texte und der Hero-Kontakt werden primär in `config/<Gebäude>/config.js` gepflegt. Die Werte `name`, `operator_name` und `contact_email` aus `Buildings` dienen der API und als Fallback, falls ein Wert in der statischen Konfiguration fehlt.
+
 ## Bookings
 
 ```text

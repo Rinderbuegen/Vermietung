@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG_FILE = ROOT / "assets" / "js" / "config.js"
+DEFAULT_CONFIG_FILE = ROOT / "config" / "config.js"
 PLACEHOLDER_URL = "https://script.google.com/macros/s/DEPLOYMENT_ID/exec"
 API_BASE_URL_PATTERN = re.compile(r'(apiBaseUrl:\s*")[^"]+(")')
 
@@ -32,12 +32,12 @@ def main() -> None:
     apps_script_url = validate_apps_script_url(sys.argv[1])
     if len(sys.argv) == 3:
         target_dir = (ROOT / sys.argv[2]).resolve()
-        config_files = sorted(target_dir.rglob("assets/js/config.js"))
+        config_files = sorted(target_dir.rglob("config/config.js"))
     else:
         config_files = [DEFAULT_CONFIG_FILE]
 
     if not config_files:
-        raise SystemExit("Keine assets/js/config.js gefunden.")
+        raise SystemExit("Keine config/config.js gefunden.")
 
     for config_file in config_files:
         content = config_file.read_text(encoding="utf-8")

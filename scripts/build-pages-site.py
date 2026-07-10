@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "_site"
 TARGETS = [SITE, SITE / "DGH", SITE / "Gemeindehaus"]
 FILES = ["index.html", "manifest.webmanifest", "service-worker.js"]
-DIRS = ["assets", "downloads"]
+DIRS = ["assets", "config", "downloads"]
 PLACEHOLDER = "<!--BUILD_TIMESTAMP-->"
 
 

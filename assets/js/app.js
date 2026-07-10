@@ -97,10 +97,10 @@
       const building = await window.Api.getBuilding();
       window.Ui.applyConfig({
         ...config,
-        appTitle: building.name || config.appTitle,
-        buildingName: building.name || config.buildingName,
-        operatorName: building.operatorName || config.operatorName,
-        contactEmail: building.contactEmail || config.contactEmail
+        appTitle: config.appTitle || building.name,
+        buildingName: config.buildingName || building.name,
+        operatorName: config.operatorName || building.operatorName,
+        contactEmail: config.contactEmail || building.contactEmail
       });
       const note = document.querySelector("[data-public-note]");
       if (note && building.publicNote) note.textContent = building.publicNote;

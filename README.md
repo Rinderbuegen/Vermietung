@@ -42,22 +42,18 @@ http://localhost:8080
 
 ## Konfiguration
 
-Datei: `assets/js/config.js`
-
-Wichtig:
+Globale Werte stehen in `config/config.js`, zum Beispiel die Apps-Script-URL:
 
 ```js
-window.APP_CONFIG = {
-  buildingId: "dgh_rb",
-  apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec"
-};
+apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec"
 ```
 
-Für das zweite Gebäude wird nur `buildingId` und sichtbarer Text angepasst:
+Gebäudespezifische Werte stehen in eigenen Dateien:
 
-```js
-buildingId: "ev_gem_rb"
-```
+- `config/DGH/config.js`
+- `config/Gemeindehaus/config.js`
+
+Dort werden unter anderem `buildingId`, Hero-Texte, Betreibername, Kontaktadresse und Theme-Farben gepflegt.
 
 ## Google Apps Script
 
@@ -75,7 +71,7 @@ Kurzfassung:
 4. `setupSheets()` im Script-Editor ausführen und Berechtigungen erlauben.
 5. Als Web-App bereitstellen.
 6. Web-App-URL mit `/exec` kopieren.
-7. URL in `assets/js/config.js` bei `apiBaseUrl` eintragen.
+7. URL in `config/config.js` bei `apiBaseUrl` eintragen.
 
 Siehe `docs/apps-script-deployment.md`.
 

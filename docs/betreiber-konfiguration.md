@@ -1,47 +1,71 @@
 # Betreiber-Konfiguration
 
-## Eine App Pro Gebäude
+## Eine App Für Mehrere Gebäude
 
-Für ein zweites Gebäude wird die statische PWA kopiert oder als zweite GitHub-Pages-App veröffentlicht. Nur `assets/js/config.js` wird angepasst.
-
-Alternativ können beide Gebäude über ein einziges GitHub-Pages-Repository laufen. Dann wird das Gebäude über feste Pfade ausgewählt:
+Beide Gebäude laufen über ein einziges GitHub-Pages-Repository. Das Gebäude wird über feste Pfade ausgewählt:
 
 ```text
 https://Rinderbuegen.github.io/vermietung/DGH/
 https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
 ```
 
-Die GitHub-Action erzeugt diese Unterseiten automatisch aus derselben Codebasis. Ohne Pfad verwendet die App den Standardwert aus `assets/js/config.js`, aktuell `dgh_rb`.
+Die GitHub-Action erzeugt diese Unterseiten automatisch aus derselben Codebasis. Ohne Pfad verwendet die App den Standardpfad aus `config/config.js`, aktuell `DGH`.
 
-## Dorfgemeinschaftshaus
+## Globale Konfiguration
+
+Datei: `config/config.js`
 
 ```js
 window.APP_CONFIG = {
-  buildingId: "dgh_rb",
-  appTitle: "Vermietung Dorfgemeinschaftshaus Rinderbügen",
-  buildingName: "Dorfgemeinschaftshaus Rinderbügen",
-  operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
-  contactEmail: "kontakt@example.com",
   apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
   showPendingRequestsInOccupancy: true,
   publicShowBookingTitles: false
 };
+
+window.APP_BUILDING_CONFIG = {
+  defaultPath: "DGH",
+  buildingIdByPath: {
+    DGH: "dgh_rb",
+    Gemeindehaus: "ev_gem_rb"
+  }
+};
+```
+
+Diese Datei enthält gemeinsame technische Werte und das Mapping von URL-Pfad zu `buildingId`.
+
+## Dorfgemeinschaftshaus
+
+Datei: `config/DGH/config.js`
+
+```js
+Object.assign(window.APP_CONFIG || (window.APP_CONFIG = {}), {
+  buildingId: "dgh_rb",
+  appTitle: "Vermietung Dorfgemeinschaftshaus Rinderbügen",
+  buildingName: "Dorfgemeinschaftshaus Rinderbügen",
+  heroTitle: "Dorfgemeinschaftshaus",
+  heroLocation: "Rinderbügen",
+  operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
+  contactEmail: "kontakt@example.com"
+});
 ```
 
 ## Evangelisches Gemeindehaus
 
+Datei: `config/Gemeindehaus/config.js`
+
 ```js
-window.APP_CONFIG = {
+Object.assign(window.APP_CONFIG || (window.APP_CONFIG = {}), {
   buildingId: "ev_gem_rb",
   appTitle: "Vermietung Evangelisches Gemeindehaus Rinderbügen",
   buildingName: "Evangelisches Gemeindehaus Rinderbügen",
+  heroTitle: "Evangelisches Gemeindehaus",
+  heroLocation: "Rinderbügen",
   operatorName: "Betreiber Evangelisches Gemeindehaus Rinderbügen",
-  contactEmail: "kontakt@example.com",
-  apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
-  showPendingRequestsInOccupancy: true,
-  publicShowBookingTitles: false
-};
+  contactEmail: "kontakt@example.com"
+});
 ```
+
+Der Kontakt im Hero-Kasten wird über `contactEmail` in der jeweiligen Gebäudedatei gepflegt. Der Sheet-Wert `Buildings.contact_email` ist nur Fallback, falls `contactEmail` in der Datei fehlt.
 
 ## Hinweise Und Downloads Pflegen
 

@@ -5,10 +5,10 @@
 
   function assertConfig() {
     if (!config.apiBaseUrl || config.apiBaseUrl.includes("DEPLOYMENT_ID")) {
-      throw new Error("Bitte Apps-Script-URL in assets/js/config.js eintragen.");
+      throw new Error("Bitte Apps-Script-URL in config/config.js eintragen.");
     }
     if (!config.buildingId) {
-      throw new Error("Bitte buildingId in assets/js/config.js eintragen.");
+      throw new Error("Bitte Gebäude-Konfiguration unter config/<Gebäude>/config.js prüfen.");
     }
   }
 

@@ -11,7 +11,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
-    <script src="assets/js/config.js"></script>
+    <script src="config/config.js"></script>
+    <script>
+      (function () {
+        var loader = window.APP_BUILDING_CONFIG || {};
+        var byPath = loader.buildingIdByPath || {};
+        var pathParts = window.location.pathname.split("/").filter(Boolean);
+        var configPath = pathParts.find(function (part) { return byPath[part]; }) || loader.defaultPath || "DGH";
+        document.write('<script src="config/' + configPath + '/config.js"><\/script>');
+      })();
+    </script>
     <script>
       (function () {
         var c = window.APP_CONFIG;
