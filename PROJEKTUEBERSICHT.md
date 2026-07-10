@@ -44,3 +44,5 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 ## Stand
 
 Version 1 ist bewusst klein gehalten. Normale Nutzer erzeugen nur offene Anfragen. Betreiber entscheiden im Google Sheet.
+
+Desktop-Layout: Bei ausreichender Breite und Höhe bleiben Kopfbereich und Footer sichtbar; nur der Hauptbereich scrollt.

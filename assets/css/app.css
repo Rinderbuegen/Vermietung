@@ -147,6 +147,37 @@ main {
   flex: 1;
 }
 
+@media (min-width: 841px) and (min-height: 560px) {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .site-header,
+  .site-footer {
+    flex: 0 0 auto;
+  }
+
+  .site-header {
+    position: static;
+  }
+
+  main {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    scrollbar-gutter: stable;
+  }
+}
+
 .section { padding-block: clamp(48px, 8vw, 86px); }
 .section:last-of-type { padding-bottom: 60px; }
 
@@ -286,6 +317,12 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
   max-width: 720px;
 }
 .section-head p { color: var(--color-text); }
+
+@media (min-width: 841px) and (min-height: 560px) {
+  .section-head {
+    top: clamp(16px, 3vw, 32px);
+  }
+}
 
 .filter-bar,
 .form-grid {
@@ -428,6 +465,7 @@ button:disabled .spinner {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
+  html,
+  main { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
 }
