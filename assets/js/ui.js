@@ -44,8 +44,6 @@
 
   function renderOccupancy(items, loadedAt, stale) {
     const list = document.getElementById("occupancyList");
-    const meta = document.getElementById("occupancyMeta");
-    meta.textContent = `${stale ? "Möglicherweise veralteter Stand" : "Stand"}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
 
     if (!items.length) {
       renderEmpty(list, "Für diesen Zeitraum sind keine Belegungen eingetragen.");
@@ -76,7 +74,6 @@
     list.innerHTML = items.map((item) => `
       <article class="list-item news-type-${escapeHtml(item.type || "info")}">
         <div>
-          <p class="meta">${escapeHtml(item.type || "info")} · ${item.date ? dateFormatter.format(new Date(item.date)) : "ohne Datum"}</p>
           <h3>${escapeHtml(item.title)}</h3>
           <div class="markdown"><p>${markdown(item.body || "")}</p></div>
         </div>
@@ -94,7 +91,6 @@
         <div>
           <h3>${escapeHtml(item.title)}</h3>
           <p>${escapeHtml(item.description || "PDF-Dokument")}</p>
-          ${item.updatedAt ? `<p class="meta">Aktualisiert: ${dateTimeFormatter.format(new Date(item.updatedAt))}</p>` : ""}
         </div>
         <a class="button button-secondary" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">PDF öffnen</a>
       </article>`).join("");
