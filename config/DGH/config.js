@@ -5,8 +5,8 @@
     buildingName: "Dorfgemeinschaftshaus Rinderbügen",
     heroTitle: "Dorfgemeinschaftshaus",
     heroLocation: "Rinderbügen",
-    operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
-    contactEmail: "kontakt@example.com",
+    operatorName: "Stadt Büdingen",
+    contactEmail: "Kuno van Euten<br/>Außenstellenbeauftragter<br/>0161/123123123123<br/>kuno@test.de",
     theme: {
       primary: "#6c0e15",
       primaryDark: "#5a0b11",
