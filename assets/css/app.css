@@ -306,7 +306,8 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
 .building-card div { padding-block: 14px; border-top: 1px solid var(--color-border); }
 .building-card div:first-child { border-top: 0; }
 .building-card dt { color: var(--color-text); font-size: 0.9rem; }
-.building-card dd { margin: 4px 0 0; font-weight: 700; color: var(--color-heading); }
+.building-card dd { margin: 4px 0 0; font-weight: 700; color: var(--color-heading); overflow-wrap: anywhere; }
+.building-card a { color: var(--color-link); overflow-wrap: anywhere; }
 
 .panel { padding: clamp(20px, 4vw, 32px); }
 

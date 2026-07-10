@@ -10,13 +10,6 @@
     });
   }
 
-  function setLink(selector, href, value) {
-    document.querySelectorAll(selector).forEach((node) => {
-      node.href = href;
-      node.textContent = value;
-    });
-  }
-
   function escapeHtml(value) {
     return String(value || "")
       .replaceAll("&", "&amp;")
@@ -36,6 +29,27 @@
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(/\n{2,}/g, "</p><p>")
       .replace(/\n/g, "<br>");
+  }
+
+  function contactLines(value) {
+    if (Array.isArray(value)) {
+      return value.map((line) => String(line || "").trim()).filter(Boolean);
+    }
+    return String(value || "")
+      .split(/<br\s*\/?\s*>|\r?\n/i)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+
+  function renderContactDetails(selector, value) {
+    const lines = contactLines(value || "Kontakt nicht hinterlegt");
+    document.querySelectorAll(selector).forEach((node) => {
+      node.innerHTML = lines.map((line) => {
+        const email = line.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"']+/);
+        const safe = escapeHtml(line);
+        return email ? `<a href="mailto:${escapeHtml(email[0])}">${safe}</a>` : safe;
+      }).join("<br>");
+    });
   }
 
   function renderEmpty(target, message) {
@@ -106,7 +120,7 @@
     text("[data-hero-title]", config.heroTitle || config.buildingName || config.appTitle || "Gebäude");
     text("[data-hero-location]", config.heroLocation || "");
     text("[data-operator-name]", config.operatorName || "Betreiber");
-    setLink("[data-contact-email]", `mailto:${config.contactEmail || ""}`, config.contactEmail || "Kontakt nicht hinterlegt");
+    renderContactDetails("[data-contact-details]", config.contactDetails || config.contactEmail);
     document.querySelectorAll("[data-building-id-field]").forEach((field) => {
       field.value = config.buildingId || "";
     });

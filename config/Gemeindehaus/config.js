@@ -6,7 +6,8 @@
     heroTitle: "Evangelisches Gemeindehaus",
     heroLocation: "Rinderbügen",
     operatorName: "Ev. Kirchengemeinde Rinderbügen",
-    contactEmail: "Kuno van Euten<br/>Küster<br/>0161/123123123123<br/>kuno@test.de",
+    contactDetails: "Kuno van Euten<br/>Küster<br/>0161/123123123123<br/>kuno@test.de",
+    contactEmail: "kuno@test.de",
     theme: {
       primary: "#5c2583",
       primaryDark: "#4a1d69",

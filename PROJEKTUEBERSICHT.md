@@ -28,7 +28,7 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 
 - `index.html`: App-Oberfläche.
 - `config/config.js`: globale Laufzeitkonfiguration inklusive Apps-Script-URL.
-- `config/DGH/config.js` und `config/Gemeindehaus/config.js`: Gebäudekonfiguration inklusive Hero-Titel, Betreiberkontakt und Theme.
+- `config/DGH/config.js` und `config/Gemeindehaus/config.js`: Gebäudekonfiguration inklusive Hero-Titel, mehrzeiligem Betreiberkontakt und Theme.
 - `assets/js/api.js`: API-Zugriff auf Apps Script.
 - `assets/js/app.js`: App-Logik und Formularverarbeitung.
 - `assets/js/ui.js`: Rendering-Helfer.

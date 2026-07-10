@@ -45,6 +45,7 @@ Object.assign(window.APP_CONFIG || (window.APP_CONFIG = {}), {
   heroTitle: "Dorfgemeinschaftshaus",
   heroLocation: "Rinderbügen",
   operatorName: "Betreiber Dorfgemeinschaftshaus Rinderbügen",
+  contactDetails: "Kuno van Euten<br/>Außenstellenbeauftragter<br/>0161/123123123123<br/>kuno@example.com",
   contactEmail: "kontakt@example.com"
 });
 ```
@@ -61,11 +62,14 @@ Object.assign(window.APP_CONFIG || (window.APP_CONFIG = {}), {
   heroTitle: "Evangelisches Gemeindehaus",
   heroLocation: "Rinderbügen",
   operatorName: "Betreiber Evangelisches Gemeindehaus Rinderbügen",
+  contactDetails: "Kuno van Euten<br/>Küster<br/>0161/123123123123<br/>kuno@example.com",
   contactEmail: "kontakt@example.com"
 });
 ```
 
-Der Kontakt im Hero-Kasten wird über `contactEmail` in der jeweiligen Gebäudedatei gepflegt. Der Sheet-Wert `Buildings.contact_email` ist nur Fallback, falls `contactEmail` in der Datei fehlt.
+Der Kontakt im Hero-Kasten wird über `contactDetails` in der jeweiligen Gebäudedatei gepflegt. Mehrere Zeilen können mit `<br/>` getrennt werden. E-Mail-Zeilen werden automatisch als `mailto:`-Link ausgegeben.
+
+`contactEmail` bleibt als einfache E-Mail-Adresse für Fallbacks erhalten. Der Sheet-Wert `Buildings.contact_email` ist nur Fallback, falls in der statischen Konfiguration kein Kontaktwert gepflegt ist.
 
 ## Hinweise Und Downloads Pflegen
 

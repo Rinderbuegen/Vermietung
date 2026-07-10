@@ -53,7 +53,7 @@ Gebäudespezifische Werte stehen in eigenen Dateien:
 - `config/DGH/config.js`
 - `config/Gemeindehaus/config.js`
 
-Dort werden unter anderem `buildingId`, Hero-Texte, Betreibername, Kontaktadresse und Theme-Farben gepflegt.
+Dort werden unter anderem `buildingId`, Hero-Texte, Betreibername, mehrzeilige Kontaktdaten und Theme-Farben gepflegt.
 
 ## Google Apps Script
 
