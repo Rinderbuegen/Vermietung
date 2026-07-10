@@ -1,11 +1,10 @@
-const CACHE_NAME = "vermietung-v2";
+const CACHE_NAME = "vermietung-v3";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./assets/icons/icon.svg",
   "./assets/css/app.css",
-  "./assets/js/config.js",
   "./assets/js/api.js",
   "./assets/js/ui.js",
   "./assets/js/app.js",
