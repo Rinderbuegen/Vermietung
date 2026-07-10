@@ -208,17 +208,24 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
   font-size: clamp(1.08rem, 2vw, 1.32rem);
 }
 
-.hero-actions,
-.form-actions {
+.hero-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
   margin-top: 24px;
 }
 
 .hero-actions .button {
   flex: 1 1 200px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
 }
 
 .button {
