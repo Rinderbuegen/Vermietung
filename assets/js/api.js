@@ -62,7 +62,8 @@
     const data = await getLocalContent("about.json");
     const item = data.items[0];
     if (!item) throw new Error("Kein Über-Dokument hinterlegt.");
-    const response = await fetch(item.url, { cache: "no-cache" });
+    const base = self.location.pathname.replace(/\/[^/]*$/, "/");
+    const response = await fetch(new URL(item.url, self.location.origin + base).href, { cache: "no-cache" });
     if (!response.ok) throw new Error("Das Über-Dokument konnte nicht geladen werden.");
     return await response.text();
   }
