@@ -115,8 +115,7 @@ button { cursor: pointer; }
 }
 
 .brand small,
-.meta,
-.eyebrow {
+.meta {
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
 }
@@ -188,7 +187,6 @@ main {
   color: #fff;
 }
 
-.hero .eyebrow { color: rgba(255, 255, 255, 0.7); }
 .hero .lead { color: rgba(255, 255, 255, 0.85); }
 .hero a { color: #fff; }
 
@@ -212,12 +210,7 @@ main {
 
 .legal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-.eyebrow {
-  margin: 0 0 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
+
 
 h1,
 h2,
