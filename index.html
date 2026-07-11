@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#6c0e15">
-    <meta name="description" content="Öffentliche Gebäudevermietung mit Belegung, Anfrageformular, Hinweisen und Downloads.">
-    <title>Gebäudevermietung</title>
+    <meta name="description" content="{{metaDescription}}">
+    <title>{{pageTitle}}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -13,15 +13,6 @@
     <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script src="config/config.js"></script>
-    <script>
-      (function () {
-        var loader = window.APP_BUILDING_CONFIG || {};
-        var byPath = loader.buildingIdByPath || {};
-        var pathParts = window.location.pathname.split("/").filter(Boolean);
-        var configPath = pathParts.find(function (part) { return byPath[part]; }) || loader.defaultPath || "DGH";
-        document.write('<script src="config/' + configPath + '/config.js"><\/script>');
-      })();
-    </script>
     <script>
       (function () {
         var c = window.APP_CONFIG;
@@ -36,24 +27,24 @@
     <link rel="stylesheet" href="assets/css/app.css">
   </head>
   <body>
-    <a class="skip-link" href="#main">Zum Inhalt springen</a>
+    <a class="skip-link" href="#main">{{skipLink}}</a>
 
     <header class="site-header">
       <div class="shell header-grid">
-        <a class="brand" href="#start" aria-label="Startseite">
-          <span class="brand-mark" aria-hidden="true">G</span>
+        <a class="brand" href="#start" aria-label="{{startPageLabel}}">
+          <span class="brand-mark" aria-hidden="true">{{brandMark}}</span>
           <span>
-            <strong data-app-title>Gebäudevermietung</strong>
-            <small data-operator-name>Betreiber</small>
+            <strong data-app-title>{{defaultAppTitle}}</strong>
+            <small data-operator-name>{{defaultOperator}}</small>
           </span>
         </a>
-        <nav class="main-nav" aria-label="Hauptnavigation">
-          <a href="#belegung">Belegung</a>
-          <a href="#anfrage">Anfrage</a>
-          <a href="#hinweise">Hinweise</a>
-          <a href="#downloads">Downloads</a>
-          <a href="#kontakt">Kontakt</a>
-          <a href="#ueber">Über</a>
+        <nav class="main-nav" aria-label="{{mainNavigationLabel}}">
+          <a href="#belegung">{{navOccupancy}}</a>
+          <a href="#anfrage">{{navRequest}}</a>
+          <a href="#hinweise">{{navNews}}</a>
+          <a href="#downloads">{{navDownloads}}</a>
+          <a href="#kontakt">{{navContact}}</a>
+          <a href="#ueber">{{navAbout}}</a>
         </nav>
       </div>
     </header>
@@ -63,23 +54,23 @@
         <div class="shell hero-grid">
           <div>
             <h1>
-              <span data-hero-title>Gebäudevermietung</span>
-              <span data-hero-location>Rinderbügen</span>
+              <span data-hero-title>{{defaultAppTitle}}</span>
+              <span data-hero-location></span>
             </h1>
-            <p class="lead" data-public-note>Prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage. Die verbindliche Bestätigung erfolgt durch den Betreiber.</p>
+            <p class="lead" data-public-note>{{publicNote}}</p>
             <div class="hero-actions">
-              <a class="button button-primary" href="#anfrage">Buchungsanfrage stellen</a>
-              <a class="button button-primary" href="#belegung">Belegung ansehen</a>
+              <a class="button button-primary" href="#anfrage">{{bookingAction}}</a>
+              <a class="button button-primary" href="#belegung">{{occupancyAction}}</a>
             </div>
           </div>
-          <aside class="building-card" aria-label="Gebäudedaten">
+          <aside class="building-card" aria-label="{{buildingDataLabel}}">
             <dl>
               <div>
-                <dd data-operator-name>Wird geladen</dd>
+                <dd data-operator-name>{{loading}}</dd>
               </div>
               <div>
-                <dt>Kontakt</dt>
-                <dd data-contact-details>kontakt@example.com</dd>
+                <dt>{{contactLabel}}</dt>
+                <dd data-contact-details>{{contactFallback}}</dd>
               </div>
             </dl>
           </aside>
@@ -89,31 +80,31 @@
       <section id="belegung" class="section">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>Belegung</h2>
-            <p>Anzeige der aktuellen Belegungen. Wählen Sie bitte einen anderen Zeitraum zur Anzeige und drücken Sie dann AKTUALISIEREN.</p>
+            <h2>{{occupancyTitle}}</h2>
+            <p>{{occupancyIntro}}</p>
           </div>
           <div class="panel">
             <form class="filter-bar" id="occupancyFilter">
               <label>
-                Zeitraum
+                {{rangeLabel}}
                 <select id="occupancyRange" name="range">
-                  <option value="current-month" selected>Aktueller Monat</option>
-                  <option value="next-month">Nächster Monat</option>
-                  <option value="year">Dieses Jahr</option>
-                  <option value="next-year">Nächstes Jahr</option>
-                  <option value="selected-month" hidden>Ausgewählter Monat</option>
+                  <option value="current-month" selected>{{rangeCurrentMonth}}</option>
+                  <option value="next-month">{{rangeNextMonth}}</option>
+                  <option value="year">{{rangeYear}}</option>
+                  <option value="next-year">{{rangeNextYear}}</option>
+                  <option value="selected-month" hidden>{{rangeSelectedMonth}}</option>
                 </select>
               </label>
               <label>
-                Ansicht
+                {{viewLabel}}
                 <select id="occupancyView" name="view">
-                  <option value="plan" selected>Belegungsplan</option>
-                  <option value="table">Tabellarisch</option>
+                  <option value="plan" selected>{{viewPlan}}</option>
+                  <option value="table">{{viewTable}}</option>
                 </select>
               </label>
-              <button class="button button-secondary" type="submit">Aktualisieren</button>
+              <button class="button button-secondary" type="submit">{{updateAction}}</button>
             </form>
-            <p class="meta" id="occupancyMeta">Noch nicht geladen.</p>
+            <p class="meta" id="occupancyMeta">{{notLoaded}}</p>
             <div id="occupancyList" class="list" aria-live="polite"></div>
           </div>
         </div>
@@ -122,52 +113,52 @@
       <section id="anfrage" class="section section-muted">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>Buchungsanfrage</h2>
-            <p>Die Anfrage wird gespeichert und vom Betreiber geprüft. Sie ist noch keine verbindliche Buchung.</p>
+            <h2>{{bookingTitle}}</h2>
+            <p>{{bookingIntro}}</p>
           </div>
           <form class="panel form-grid" id="bookingForm" novalidate>
             <input type="hidden" name="buildingId" data-building-id-field>
             <label>
-              Datum *
+              {{dateLabel}}
               <input name="date" type="date" required>
             </label>
             <label>
-              Ganzer Tag
+              {{allDayLabel}}
               <select name="allDay">
-                <option value="false" selected>Nein</option>
-                <option value="true">Ja</option>
+                <option value="false" selected>{{noLabel}}</option>
+                <option value="true">{{yesLabel}}</option>
               </select>
             </label>
             <label>
-              Uhrzeit von *
+              {{timeFromLabel}}
               <input name="from" type="time" required>
             </label>
             <label>
-              Uhrzeit bis *
+              {{timeToLabel}}
               <input name="to" type="time" required>
             </label>
             <label class="wide">
-              Name *
+              {{nameLabel}}
               <input name="requesterName" maxlength="120" autocomplete="name" required>
             </label>
             <label class="wide">
-              Kontaktmöglichkeit *
-              <input name="requesterContact" maxlength="160" autocomplete="email" placeholder="E-Mail oder Telefonnummer" required>
+              {{requesterContactLabel}}
+              <input name="requesterContact" maxlength="160" autocomplete="email" placeholder="{{requesterContactPlaceholder}}" required>
             </label>
             <label class="wide">
-              Zweck / Titel *
+              {{purposeLabel}}
               <input name="title" maxlength="140" required>
             </label>
             <label class="wide">
-              Bemerkung
+              {{noteLabel}}
               <textarea name="note" maxlength="1000" rows="5"></textarea>
             </label>
             <label class="checkbox wide">
               <input name="privacyConsent" type="checkbox" required>
-              <span>Ich bin damit einverstanden, dass meine Angaben zur Bearbeitung der Anfrage verwendet werden. Mir ist bewusst, dass daraus noch keine verbindliche Buchung entsteht.</span>
+              <span>{{bookingConsent}}</span>
             </label>
             <div class="form-actions wide">
-              <button class="button button-primary" type="submit">Anfrage senden</button>
+              <button class="button button-primary" type="submit">{{sendBookingAction}}</button>
               <p class="form-message" id="bookingMessage" aria-live="polite"></p>
             </div>
           </form>
@@ -177,8 +168,8 @@
       <section id="hinweise" class="section">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>Neuigkeiten / Hinweise</h2>
-            <p>Aktuelle Mitteilungen zur Nutzung des Gebäudes.</p>
+            <h2>{{newsTitle}}</h2>
+            <p>{{newsIntro}}</p>
           </div>
           <div class="panel">
             <div id="newsList" class="list" aria-live="polite"></div>
@@ -189,8 +180,8 @@
       <section id="downloads" class="section section-muted">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>Downloads</h2>
-            <p>Dokumente rund um Vermietung, das Gebäude und die Räumlichkeiten.</p>
+            <h2>{{downloadsTitle}}</h2>
+            <p>{{downloadsIntro}}</p>
           </div>
           <div class="panel">
             <div id="downloadsList" class="list" aria-live="polite"></div>
@@ -201,32 +192,32 @@
       <section id="kontakt" class="section">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>Kontakt</h2>
-            <p>Nutzen Sie dieses Formular für allgemeine Fragen zur Vermietung und dem Gebäude. Bitte prüfen Sie vorher im Abschnitt <a href="#downloads">Downloads</a>, ob sich dort ein Dokument findet, das vorab Ihre Fragen beantwortet.</p>
+            <h2>{{contactTitle}}</h2>
+            <p>{{contactIntro}}</p>
           </div>
           <form class="panel form-grid" id="contactForm" novalidate>
             <label class="wide">
-              Name *
+              {{nameLabel}}
               <input name="name" maxlength="120" autocomplete="name" required>
             </label>
             <label class="wide">
-              Kontaktmöglichkeit *
+              {{requesterContactLabel}}
               <input name="contact" maxlength="160" autocomplete="email" required>
             </label>
             <label class="wide">
-              Betreff *
+              {{subjectLabel}}
               <input name="subject" maxlength="140" required>
             </label>
             <label class="wide">
-              Nachricht *
+              {{messageLabel}}
               <textarea name="message" maxlength="1200" rows="5" required></textarea>
             </label>
             <label class="checkbox wide">
               <input name="privacyConsent" type="checkbox" required>
-              <span>Ich bin damit einverstanden, dass meine Angaben zur Bearbeitung der Kontaktanfrage verwendet werden.</span>
+              <span>{{contactConsent}}</span>
             </label>
             <div class="form-actions wide">
-              <button class="button button-primary" type="submit">Kontaktanfrage senden</button>
+              <button class="button button-primary" type="submit">{{sendContactAction}}</button>
               <p class="form-message" id="contactMessage" aria-live="polite"></p>
             </div>
           </form>
@@ -236,7 +227,7 @@
       <section id="ueber" class="section section-muted">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>Über dieses Angebot</h2>
+            <h2>{{aboutTitle}}</h2>
           </div>
           <div class="panel">
             <div id="aboutContent" class="markdown" aria-live="polite"></div>
@@ -245,25 +236,14 @@
       </section>
 
       <section id="rechtliches" class="section legal-section">
-        <div class="shell legal-grid">
-          <article class="panel">
-            <h2>Datenschutz</h2>
-            <p>Diese Anwendung verarbeitet Angaben aus Buchungs- und Kontaktformularen nur zur Bearbeitung Ihrer Anfrage. Es werden keine Tracking-Cookies eingesetzt.</p>
-            <p><strong>Platzhalter:</strong> Betreiber müssen hier vor Veröffentlichung ihre vollständige Datenschutzerklärung ergänzen.</p>
-          </article>
-          <article class="panel">
-            <h2>Impressum</h2>
-            <p><strong data-operator-name>Betreiber</strong></p>
-            <p><strong>Platzhalter:</strong> Adresse, Vertretungsberechtigte, Telefon, E-Mail und weitere Pflichtangaben ergänzen.</p>
-          </article>
-        </div>
+        <div class="shell legal-grid">{{legalContent}}</div>
       </section>
     </main>
 
     <footer class="site-footer">
       <div class="shell footer-grid">
-        <span class="footer-updated">Aktualisiert: <!--BUILD_TIMESTAMP--></span>
-        <a href="#rechtliches">Datenschutz / Impressum</a>
+        <span class="footer-updated">{{updatedLabel}} <!--BUILD_TIMESTAMP--></span>
+        <a href="#rechtliches">{{legalLink}}</a>
       </div>
     </footer>
 

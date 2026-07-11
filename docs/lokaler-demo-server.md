@@ -147,7 +147,7 @@ CA nach dem Test entfernen:
 
 Der lokale Demo-Build orientiert sich an `.github/workflows/pages.yml`. Die maßgeblichen Repository-Dateien sind:
 
-1. `scripts/build-content-index.py` erzeugt die Indizes für Hinweise, Downloads und weitere Inhalte.
+1. `scripts/build-apps-script.py` erzeugt das deploybare Backend; `scripts/build-pages-site.py` erzeugt scope-isolierte Inhaltsindizes und Seiten.
 2. `scripts/build-pages-site.py` erzeugt `_site/` mit `DGH/` und `Gemeindehaus/`.
 3. `scripts/verify-pages-site.py` prüft Scopes, Manifest, Icons, lokale Links und Service-Worker-Registrierung.
 4. `tests/service-worker.test.js` prüft Cache- und Offline-Verhalten mit Node.js.
@@ -240,4 +240,4 @@ Service Worker und Website-Daten für `localhost:8443` beziehungsweise die LAN-I
 
 ### Build Oder Test Schlägt Fehl
 
-Die erste Fehlermeldung im Terminal auswerten. Bei Inhaltsfehlern die von `scripts/build-content-index.py` verarbeiteten Markdown- und PDF-Dateien prüfen. Bei Pfad-, Manifest- oder Service-Worker-Fehlern `scripts/verify-pages-site.py` beziehungsweise `tests/service-worker.test.js` nicht überspringen; die lokale Demo soll nur eine vollständig geprüfte `_site/`-Ausgabe ausliefern. Meldet `tools/test-demo.py`, dass `playwright` fehlt, die beiden Installationsbefehle aus dem Abschnitt Playwright-Test ausführen.
+Die erste Fehlermeldung im Terminal auswerten. Bei Inhaltsfehlern die Betreiberdateien unter `betreiber/` prüfen. Bei Pfad-, Manifest- oder Service-Worker-Fehlern `scripts/verify-pages-site.py` beziehungsweise `tests/service-worker.test.js` nicht überspringen; die lokale Demo soll nur eine vollständig geprüfte `_site/`-Ausgabe ausliefern. Meldet `tools/test-demo.py`, dass `playwright` fehlt, die beiden Installationsbefehle aus dem Abschnitt Playwright-Test ausführen.

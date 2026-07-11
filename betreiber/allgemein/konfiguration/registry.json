@@ -1,0 +1,13 @@
+{
+  "defaultArea": "DGH",
+  "areas": {
+    "DGH": {
+      "publicPath": "DGH",
+      "buildingId": "dgh_rb"
+    },
+    "EV_GEMEINDEHAUS": {
+      "publicPath": "Gemeindehaus",
+      "buildingId": "ev_gem_rb"
+    }
+  }
+}

@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-const source = fs.readFileSync(path.join(__dirname, "..", "service-worker.js"), "utf8");
+const source = fs.readFileSync(path.join(__dirname, "..", "_site", "DGH", "service-worker.js"), "utf8");
 
 function requestKey(request) {
   if (typeof request === "string") return request;
@@ -93,11 +93,11 @@ function getRequest(url, overrides = {}) {
 
   const dghCache = dgh.opened[0];
   const gemeindehausCache = gemeindehaus.opened[0];
-  assert.match(dghCache, /v17$/);
-  assert.match(gemeindehausCache, /v17$/);
+  assert.match(dghCache, /[a-f0-9]{12}$/);
+  assert.match(gemeindehausCache, /[a-f0-9]{12}$/);
   assert.notEqual(dghCache, gemeindehausCache, "Scopes dürfen keinen Cache teilen");
 
-  const oldDghCache = dghCache.replace(/v17$/, "v15");
+  const oldDghCache = dghCache.replace(/[a-f0-9]{12}$/, "000000000000");
   const activation = worker(dghScope, {
     cacheNames: [oldDghCache, dghCache, gemeindehausCache, "fremde-anwendung-v1", "vermietung-v15"],
   });

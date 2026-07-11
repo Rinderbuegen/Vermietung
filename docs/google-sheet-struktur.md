@@ -10,7 +10,7 @@ building_id | name | operator_name | contact_email | active | public_note
 
 `active` muss `true` sein, damit das Gebäude über die API nutzbar ist.
 
-Sichtbare UI-Texte und der Hero-Kontakt werden primär in `config/<Gebäude>/config.js` gepflegt. Für mehrzeilige Hero-Kontakte wird dort `contactDetails` genutzt. Die Werte `name`, `operator_name` und `contact_email` aus `Buildings` dienen der API und als Fallback, falls ein Wert in der statischen Konfiguration fehlt.
+Sichtbare UI-Texte und der Hero-Kontakt werden unter `betreiber/allgemein/texte` und `betreiber/<Bereich>/konfiguration/frontend.json` gepflegt. Die Werte aus `Buildings` dienen der API und als Fallback.
 
 ## Bookings
 
@@ -98,7 +98,7 @@ Wichtig:
 
 Hinweise und Downloads werden nicht in Google Sheets gepflegt. Sie liegen im GitHub-Repository:
 
-- Hinweise: `news/<buildingId>/*.md` mit Frontmatter.
-- Downloads: `downloads/<buildingId>/*.pdf` mit PDF-Properties.
+- Hinweise: `betreiber/<Bereich>/news/*.md` mit Frontmatter.
+- Downloads: `betreiber/<Bereich>/downloads/oeffentlich/*.pdf` mit PDF-Properties.
 
 Siehe `docs/github-content.md`.

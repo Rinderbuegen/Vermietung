@@ -8,7 +8,7 @@ Diese Anleitung richtet sich an Personen, die Google Apps Script noch nicht genu
 - `Apps Script`: kleines Google-Script, das zwischen PWA und Sheets sitzt.
 - `Web-App`: öffentlich erreichbare URL des Apps Scripts.
 - `setupSheets()`: Hilfsfunktion, die Tabs und Kopfzeilen in den zwei Sheets anlegt.
-- `Deployment-URL`: URL, die später in `config/config.js` eingetragen wird.
+- `Deployment-URL`: öffentliche URL, die beim Build über `APPS_SCRIPT_WEB_APP_URL` gesetzt wird.
 
 ## Vorhandene Sheets
 
@@ -31,7 +31,7 @@ ev_gem_rb -> Evangelisches Gemeindehaus Rinderbügen
 5. Projektnamen ändern, zum Beispiel `Gebäudevermietung API`.
 6. Datei `Code.gs` im Editor öffnen.
 7. Vorhandenen Inhalt komplett löschen.
-8. Inhalt aus `apps-script/Code.gs` aus diesem Repository komplett einfügen.
+8. `python scripts/build-apps-script.py` ausführen und den vollständigen Inhalt aus `apps-script/buchungs-api/Code.gs` einfügen.
 9. Speichern: Disketten-Symbol oder `Strg+S`.
 
 ## 2. setupSheets() Ausführen
@@ -143,7 +143,7 @@ Wenn `ok` auf `false` steht, die Fehlermeldung lesen. Häufige Ursachen:
 Datei öffnen:
 
 ```text
-config/config.js
+betreiber/allgemein/konfiguration/frontend.json
 ```
 
 Diesen Wert ersetzen:
@@ -162,8 +162,8 @@ apiBaseUrl: "https://script.google.com/macros/s/AKfycb.../exec",
 
 Nicht im Apps Script und nicht in Google Drive pflegen.
 
-- PDFs kommen nach `downloads/dgh_rb/` oder `downloads/ev_gem_rb/`.
-- Hinweise kommen nach `news/dgh_rb/` oder `news/ev_gem_rb/`.
+- PDFs kommen nach `betreiber/<Bereich>/downloads/oeffentlich/`.
+- Hinweise kommen nach `betreiber/<Bereich>/news/`.
 - Metadaten kommen aus PDF-Properties bzw. Markdown-Frontmatter.
 - Die GitHub-Action erzeugt beim Deployment automatisch die Indexdateien.
 
@@ -174,7 +174,8 @@ Siehe `docs/github-content.md`.
 Wenn Hinweise oder PDFs lokal ergänzt wurden, zuerst den Index erzeugen:
 
 ```pwsh
-python scripts/build-content-index.py
+python scripts/build-apps-script.py
+python scripts/build-pages-site.py
 ```
 
 Danach die lokale Demo mit `tools\demo-server.cmd` starten. Voraussetzungen und Aufruf sind in `docs/lokaler-demo-server.md` beschrieben.

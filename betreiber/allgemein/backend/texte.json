@@ -1,0 +1,7 @@
+{
+  "unknownAction": "Diese Aktion ist nicht bekannt.",
+  "serverError": "Die Anfrage konnte nicht verarbeitet werden.",
+  "bookingStored": "Anfrage wurde gespeichert.",
+  "contactStored": "Kontaktanfrage wurde gespeichert.",
+  "mailBookingSubject": "Neue Buchungsanfrage"
+}

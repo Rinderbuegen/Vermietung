@@ -13,3 +13,8 @@ Lade bei passenden Aufgaben vor Analyse oder Änderung den zugehörigen projektl
 Sind mehrere Bereiche betroffen, lade alle passenden Skills. Die Skill-Dateien liegen unter `.agents/skills/<skill>/SKILL.md`; Quellen und Prüfsummen stehen in `skills-lock.json`.
 
 Weitere Hinweise und Beispiele: `docs/SkillsOverview.md`.
+
+# Begriffe / Synonyme in Prompts
+
+* Dorfgemeinschaftshaus: DGH, Bürgerhaus, Gemeinschaftshaus
+* Evangelisches Gemeindehauss: Gemeindehaus, Kirche (Falscher Begriff wird aber gerne mal verwechselt. Gemeint ist das Gebäude, dort finden auch ab und zu Gottestdienste drin statt)

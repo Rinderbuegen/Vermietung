@@ -35,7 +35,7 @@ Die App erkennt den Pfad:
 /Gemeindehaus/ -> buildingId ev_gem_rb
 ```
 
-Die globale Datei `config/config.js` enthält gemeinsame Werte. Gebäudespezifische Werte stehen getrennt in `config/DGH/config.js` und `config/Gemeindehaus/config.js`. Die GitHub-Action kopiert dieselbe App nach `DGH/` und `Gemeindehaus/`.
+Die Registry unter `betreiber/allgemein/konfiguration/registry.json` hält öffentliche Pfade und IDs stabil. Der Build erzeugt `DGH/` und `Gemeindehaus/` jeweils nur aus `allgemein` und dem eigenen Betreiberbereich.
 
 ## Lokale Links Mit Derselben Pfadstruktur
 

@@ -1,0 +1,10 @@
+{
+  "appTitle": "Vermietung Evangelisches Gemeindehaus Rinderbügen",
+  "buildingName": "Evangelisches Gemeindehaus Rinderbügen",
+  "heroTitle": "Evangelisches Gemeindehaus",
+  "heroLocation": "Rinderbügen",
+  "operatorName": "Ev. Kirchengemeinde Rinderbügen",
+  "contactDetails": ["Kuno van Euten", "Küster", "0161/123123123123", "kuno@test.de"],
+  "contactEmail": "kuno@test.de",
+  "theme": {"primary":"#5c2583","primaryDark":"#4a1d69","secondary":"#741cc0","link":"#5c2583","bgPage":"#f2ecfa","bgMuted":"#f2ecfa","border":"#e4cefa","dark":"#3d3050"}
+}

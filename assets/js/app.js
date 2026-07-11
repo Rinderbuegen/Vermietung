@@ -2,7 +2,7 @@
   "use strict";
 
   const config = window.APP_CONFIG || {};
-  const PWA_BUILDING_PATHS = ["DGH", "Gemeindehaus"];
+  const texts = config.texts || {};
   let currentOccupancyPayload = null;
   let currentOccupancyRange = null;
 
@@ -66,7 +66,7 @@
 
   function validateBooking(data) {
     if (!data.date || !data.requesterName || !data.requesterContact || !data.title || data.privacyConsent !== "on") {
-      return "Bitte alle Pflichtfelder ausfüllen und den Hinweis bestätigen.";
+      return texts.bookingRequired;
     }
     if (data.allDay === "true") {
       data.from = "00:00";
@@ -74,14 +74,14 @@
       return "";
     }
     if (!data.from || !data.to || data.from >= data.to) {
-      return "Bitte eine gültige Uhrzeit eintragen. Start muss vor Ende liegen.";
+      return texts.invalidTime;
     }
     return "";
   }
 
   function validateContact(data) {
     if (!data.name || !data.contact || !data.subject || !data.message || data.privacyConsent !== "on") {
-      return "Bitte alle Pflichtfelder ausfüllen und den Datenschutzhinweis bestätigen.";
+      return texts.contactRequired;
     }
     return "";
   }
@@ -93,10 +93,10 @@
         button.dataset.originalHtml = button.innerHTML;
       }
       button.disabled = true;
-      button.innerHTML = '<span class="spinner" aria-hidden="true"></span> ' + (loadingText || 'wird geladen …');
+      button.innerHTML = '<span class="spinner" aria-hidden="true"></span> ' + (loadingText || texts.loadingLower);
     } else {
       button.disabled = false;
-      button.innerHTML = button.dataset.originalHtml || 'Absenden';
+      button.innerHTML = button.dataset.originalHtml || texts.sendFallback;
       delete button.dataset.originalHtml;
     }
   }
@@ -111,15 +111,15 @@
         button.dataset.originalHtml = button.innerHTML;
       }
       button.disabled = true;
-      button.innerHTML = '<span class="spinner" aria-hidden="true"></span> wird gesendet …';
+      button.innerHTML = '<span class="spinner" aria-hidden="true"></span> ' + texts.sending;
       if (message) {
         const label = button.dataset.originalHtml.replace(/ senden$/, '');
-        message.textContent = label + ' wird gesendet …';
+        message.textContent = label + ' ' + texts.sending;
         message.className = 'form-message';
       }
     } else {
       button.disabled = false;
-      button.innerHTML = button.dataset.originalHtml || 'Absenden';
+      button.innerHTML = button.dataset.originalHtml || texts.sendFallback;
       delete button.dataset.originalHtml;
     }
   }
@@ -164,10 +164,10 @@
         } else {
           window.Ui.renderOccupancy(payload.items || [], payload.loadedAt || new Date().toISOString(), true);
         }
-        meta.textContent += ` · Abruf fehlgeschlagen: ${error.message}`;
+        meta.textContent += ` · ${texts.occupancyLoadFailed} ${error.message}`;
       } else {
-        meta.textContent = `Abruf fehlgeschlagen: ${error.message}`;
-        window.Ui.renderEmpty(document.getElementById("occupancyList"), "Die Belegung konnte nicht geladen werden.");
+        meta.textContent = `${texts.occupancyLoadFailed} ${error.message}`;
+        window.Ui.renderEmpty(document.getElementById("occupancyList"), texts.occupancyLoadFailed);
       }
     }
   }
@@ -179,7 +179,7 @@
     form.elements.allDay.value = "true";
     form.elements.allDay.dispatchEvent(new Event("change"));
     if (message) {
-      message.textContent = "Datum wurde aus dem Belegungsplan übernommen.";
+      message.textContent = texts.datePrefilled;
       message.className = "form-message";
     }
     form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -197,7 +197,7 @@
         .sort((a, b) => Number(a.sortOrder || 999) - Number(b.sortOrder || 999) || String(b.date || "").localeCompare(String(a.date || "")));
       window.Ui.renderNews(items);
     } catch (error) {
-      window.Ui.renderEmpty(document.getElementById("newsList"), `Hinweise konnten nicht geladen werden: ${error.message}`);
+      window.Ui.renderEmpty(document.getElementById("newsList"), `${texts.newsLoadFailed} ${error.message}`);
     }
   }
 
@@ -206,7 +206,7 @@
       const data = await window.Api.getDownloads();
       window.Ui.renderDownloads(data.items || []);
     } catch (error) {
-      window.Ui.renderEmpty(document.getElementById("downloadsList"), `Downloads konnten nicht geladen werden: ${error.message}`);
+      window.Ui.renderEmpty(document.getElementById("downloadsList"), `${texts.downloadsLoadFailed} ${error.message}`);
     }
   }
 
@@ -216,7 +216,7 @@
       window.Ui.renderAbout(text);
     } catch (error) {
       const container = document.getElementById("aboutContent");
-      if (container) container.innerHTML = `<p class="empty">Über-Dokument konnte nicht geladen werden: ${window.Ui.escapeHtml(error.message)}</p>`;
+      if (container) container.innerHTML = `<p class="empty">${window.Ui.escapeHtml(texts.aboutLoadFailed)} ${window.Ui.escapeHtml(error.message)}</p>`;
     }
   }
 
@@ -225,8 +225,8 @@
       event.preventDefault();
       const button = event.currentTarget.querySelector('button[type="submit"]');
       const meta = document.getElementById("occupancyMeta");
-      setButtonLoading(button, true, 'wird aktualisiert …');
-      if (meta) meta.textContent = 'Belegung wird aktualisiert …';
+      setButtonLoading(button, true, texts.updating);
+      if (meta) meta.textContent = texts.occupancyUpdating;
       try {
         await loadOccupancy();
       } finally {
@@ -254,7 +254,7 @@
       const range = monthRange(button.dataset.occupancyMonth);
       select.dataset.from = range.from;
       select.dataset.to = range.to;
-      option.textContent = button.dataset.occupancyMonthLabel || "Ausgewählter Monat";
+      option.textContent = button.dataset.occupancyMonthLabel || texts.rangeSelectedMonth;
       option.hidden = false;
       select.value = "selected-month";
       document.getElementById("occupancyView").value = "table";
@@ -273,7 +273,7 @@
         return;
       }
       if (!navigator.onLine) {
-        message.textContent = "Sie sind offline. Buchungsanfragen können erst wieder online gesendet werden.";
+        message.textContent = texts.bookingOffline;
         message.className = "form-message is-error";
         return;
       }
@@ -281,7 +281,7 @@
       try {
         await window.Api.createBookingRequest(data);
         form.reset();
-        message.textContent = "Ihre Anfrage wurde übermittelt. Sie ist noch keine verbindliche Buchung. Der Betreiber wird die Anfrage prüfen.";
+        message.textContent = texts.bookingSuccess;
         message.className = "form-message is-success";
         loadOccupancy();
       } catch (requestError) {
@@ -304,7 +304,7 @@
         return;
       }
       if (!navigator.onLine) {
-        message.textContent = "Sie sind offline. Kontaktanfragen können erst wieder online gesendet werden.";
+        message.textContent = texts.contactOffline;
         message.className = "form-message is-error";
         return;
       }
@@ -312,7 +312,7 @@
       try {
         await window.Api.createContactRequest(data);
         form.reset();
-        message.textContent = "Ihre Kontaktanfrage wurde übermittelt.";
+        message.textContent = texts.contactSuccess;
         message.className = "form-message is-success";
       } catch (requestError) {
         message.textContent = requestError.message;
@@ -353,12 +353,13 @@
     loadNews();
     loadDownloads();
     loadAbout();
-    const pathSegments = window.location.pathname.split("/").filter(Boolean);
-    const buildingPaths = pathSegments.filter((segment) => PWA_BUILDING_PATHS.includes(segment));
-    if ("serviceWorker" in navigator && buildingPaths.length === 1) {
-      const buildingIndex = pathSegments.indexOf(buildingPaths[0]);
-      const scope = `/${pathSegments.slice(0, buildingIndex + 1).join("/")}/`;
-      navigator.serviceWorker.register(`${scope}service-worker.js`, { scope }).catch(console.warn);
+    if ("serviceWorker" in navigator) {
+      const scope = new URL("./", window.location.href).pathname;
+      if (config.registerServiceWorker) {
+        navigator.serviceWorker.register(`${scope}service-worker.js`, { scope }).catch(console.warn);
+      } else {
+        navigator.serviceWorker.getRegistration(scope).then((registration) => registration && registration.unregister()).catch(console.warn);
+      }
     }
   });
 

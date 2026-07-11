@@ -106,9 +106,11 @@ try {
 
     Push-Location $RootDir
     try {
-        Invoke-Checked $python.Source "scripts/build-content-index.py"
+        Invoke-Checked $python.Source "scripts/build-apps-script.py"
         Invoke-Checked $python.Source "scripts/build-pages-site.py"
         Invoke-Checked $python.Source "scripts/verify-pages-site.py"
+        Invoke-Checked $python.Source "tests/content-build.test.py"
+        Invoke-Checked $python.Source "tests/configure-runtime.test.py"
         Invoke-Checked $node.Source "tests/service-worker.test.js"
         Invoke-Checked $python.Source "scripts/configure-runtime.py" $env:APPS_SCRIPT_WEB_APP_URL "_site"
         Invoke-Checked $python.Source "scripts/verify-pages-site.py" "--final-artifact"

@@ -28,9 +28,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: python scripts/build-content-index.py
+      - run: python scripts/build-apps-script.py
       - run: python scripts/build-pages-site.py
       - run: python scripts/verify-pages-site.py
+      - run: python tests/content-build.test.py
+      - run: python tests/configure-runtime.test.py
       - run: node tests/service-worker.test.js
       - name: Configure runtime
         env:

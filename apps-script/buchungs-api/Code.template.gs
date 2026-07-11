@@ -1,38 +1,9 @@
-const BACKEND_CONFIG = {
-  "buildings": {
-    "dgh_rb": {
-      "spreadsheetId": "11yws8ZxRB9U2oyeW8hwwC_WTR1AYLao4_iNkZEIwThc",
-      "name": "Dorfgemeinschaftshaus Rinderbügen",
-      "operatorName": "Betreiber Dorfgemeinschaftshaus Rinderbügen",
-      "contactEmail": "kontakt@example.com",
-      "notifyEmail": "kontakt@example.com",
-      "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
-      "publicShowBookingTitles": false,
-      "active": true
-    },
-    "ev_gem_rb": {
-      "spreadsheetId": "1GaqxZtkEx_lByT1odJXkS4Rp80Kr4cuLwFWz32Ssq1E",
-      "name": "Evangelisches Gemeindehaus Rinderbügen",
-      "operatorName": "Betreiber Evangelisches Gemeindehaus Rinderbügen",
-      "contactEmail": "kontakt@example.com",
-      "notifyEmail": "kontakt@example.com",
-      "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
-      "publicShowBookingTitles": false,
-      "active": true
-    }
-  }
-};
+const BACKEND_CONFIG = "__BACKEND_CONFIG__";
 const SPREADSHEETS_BY_BUILDING_ID = Object.keys(BACKEND_CONFIG.buildings).reduce((result, buildingId) => {
   result[buildingId] = BACKEND_CONFIG.buildings[buildingId].spreadsheetId;
   return result;
 }, {});
-const BACKEND_TEXTS = {
-  "unknownAction": "Diese Aktion ist nicht bekannt.",
-  "serverError": "Die Anfrage konnte nicht verarbeitet werden.",
-  "bookingStored": "Anfrage wurde gespeichert.",
-  "contactStored": "Kontaktanfrage wurde gespeichert.",
-  "mailBookingSubject": "Neue Buchungsanfrage"
-};
+const BACKEND_TEXTS = "__BACKEND_TEXTS__";
 
 const SHEET_HEADERS = {
   Buildings: ["building_id", "name", "operator_name", "contact_email", "active", "public_note"],

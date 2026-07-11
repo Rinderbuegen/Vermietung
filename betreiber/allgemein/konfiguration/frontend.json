@@ -1,0 +1,11 @@
+{
+  "apiBaseUrl": "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
+  "publicShowBookingTitles": false,
+  "manifest": {
+    "name": "Gebäudevermietung",
+    "short_name": "Vermietung",
+    "description": "Öffentliche Gebäudevermietung mit Belegung und Anfrageformular.",
+    "background_color": "#eaeaea",
+    "theme_color": "#6c0e15"
+  }
+}

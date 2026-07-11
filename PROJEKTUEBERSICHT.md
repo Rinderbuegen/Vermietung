@@ -1,59 +1,30 @@
 # Projektübersicht
 
-## Zweck
-
-Statische PWA für Gebäudevermietung. Nutzer können öffentliche Belegung sehen, Buchungsanfragen stellen, Hinweise lesen, PDFs öffnen und Kontaktanfragen senden.
-
-## Leitprinzip
-
-Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pflegen. Keine eigene Adminoberfläche und keine eigene Datenbank.
-
-## Technik
-
-- Frontend: HTML, CSS, Vanilla JavaScript.
-- Hosting: GitHub Pages.
-- Lokale Demo: `tools/demo-server.cmd` baut `_site/` und stellt beide Gebäudepfade mit Caddy und mkcert unter HTTPS auf `localhost:8443` sowie im privaten LAN bereit.
-- Repository: `https://github.com/Rinderbuegen/Vermietung`.
-- Pages-Pfade: `https://Rinderbuegen.github.io/Vermietung/DGH/` und `https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/`.
-- Backend/API: Google Apps Script Web-App.
-- Betriebsdaten: private Google Sheets.
-- Hinweise: Markdown-Dateien im GitHub-Repository mit Frontmatter.
-- Downloads: PDF-Dateien im GitHub-Repository, Metadaten aus PDF-Properties.
-
-## Gebäudekonfiguration
-
-- `dgh_rb`: Dorfgemeinschaftshaus Rinderbügen, Spreadsheet `11yws8ZxRB9U2oyeW8hwwC_WTR1AYLao4_iNkZEIwThc`
-- `ev_gem_rb`: Evangelisches Gemeindehaus Rinderbügen, Spreadsheet `1GaqxZtkEx_lByT1odJXkS4Rp80Kr4cuLwFWz32Ssq1E`
-
-## Wichtige Dateien
-
-- `index.html`: App-Oberfläche.
-- `config/config.js`: globale Laufzeitkonfiguration inklusive Apps-Script-URL.
-- `config/DGH/config.js` und `config/Gemeindehaus/config.js`: Gebäudekonfiguration inklusive Hero-Titel, mehrzeiligem Betreiberkontakt und Theme.
-- `assets/js/api.js`: API-Zugriff auf Apps Script.
-- `assets/js/app.js`: App-Logik und Formularverarbeitung.
-- `assets/js/ui.js`: Rendering-Helfer.
-- `assets/css/app.css`: Designsystem und Layout.
-- `service-worker.js`: scope-isolierter Offline-Cache. Offline ist die App rein lesend; Formulare bleiben online-only. Lokale Inhalte und die zuletzt geladene Belegung sind offline verfügbar, soweit sie zuvor geladen und zwischengespeichert wurden.
-- `scripts/build-content-index.py`: erzeugt lokale Inhaltsindizes für Hinweise und PDFs.
-- `scripts/build-pages-site.py`: erzeugt `_site/`, `DGH/` und `Gemeindehaus/` für GitHub Pages.
-- `scripts/configure-runtime.py`: setzt die öffentliche Apps-Script-Web-App-URL vor dem Deployment.
-- `tools/demo-server.cmd` und `tools/demo-server.ps1`: Windows-Einstiegspunkt und Ablauf für lokalen Build, Prüfung und HTTPS-Demo mit Caddy und mkcert.
-- `tools/Caddyfile`: HTTPS-, Pfad-, Redirect- und Dateiserver-Konfiguration der lokalen Demo.
-- `tools/test-demo.py`: Playwright-Prüfung beider Gebäude, PWA-Scopes, Redirects und 404-Antworten.
-- `docs/lokaler-demo-server.md`: Bedienung, Voraussetzungen, Zertifikate, Mobilgeräte, Tests und Fehlerbehebung der lokalen Demo.
-- `assets/data/news.json`: automatisch erzeugter Hinweisindex.
-- `assets/data/downloads.json`: automatisch erzeugter Downloadindex.
-- `apps-script/Code.gs`: Google-Apps-Script-Backend.
-- `docs/`: Betriebsdokumentation.
-- `AGENTS.md`: Projektanweisungen zum automatischen Laden passender Skills.
-- `docs/SkillsOverview.md`: Übersicht aller verfügbaren projektlokalen, globalen und eingebauten Skills mit Dokumentation und Beispielen.
-- `skills-lock.json`: Quellen und Prüfsummen der projektlokal installierten Skills.
-
 ## Stand
 
-Version 1.1 ist bewusst klein gehalten. Normale Nutzer erzeugen nur offene Anfragen. Betreiber entscheiden im Google Sheet.
+Version 1.2. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
 
-Desktop-Layout: Bei ausreichender Breite und Höhe bleiben Kopfbereich und Footer sichtbar; nur der Hauptbereich scrollt.
+## Architektur
 
-Belegung: Standard ist der Belegungsplan für den aktuellen Monat. Der Zeitraum `Nächster Monat` zeigt den aktuellen und den nächsten Monat. Nutzer können zwischen tabellarischer Liste und Belegungsplan wechseln. Angezeigt werden nur Einträge aus `Bookings`, keine offenen Anfragen aus `Requests`. Im Belegungsplan sind Tage als `frei`, `belegt` oder `teilweise belegt` markiert; ein Klick auf einen Monat zeigt genau diesen Monat tabellarisch. Ein Klick auf einen freien Tag übernimmt das Datum als ganztägige Buchungsanfrage und fokussiert das Namensfeld.
+- Frontend: `index.html`, `assets/css`, `assets/js`; technische Quellen ohne Betreiberwerte.
+- Betreiberquelle: ausschließlich `betreiber/{allgemein,DGH,EV_GEMEINDEHAUS}`.
+- Registry: `betreiber/allgemein/konfiguration/registry.json` hält `DGH -> /DGH/ -> dgh_rb` und `EV_GEMEINDEHAUS -> /Gemeindehaus/ -> ev_gem_rb` stabil.
+- Merge: gemeinsame Inhalte zuerst, Gebäude-Overrides anhand stabiler IDs beziehungsweise relativer Pfade danach.
+- Build: `scripts/build-pages-site.py` erzeugt Root, `/DGH/` und `/Gemeindehaus/` isoliert. Root entspricht DGH, liefert und registriert aber keinen Service Worker für den übergeordneten Scope.
+- Inhalte: `scripts/build-content-index.py` erzeugt scope-eigene `assets/data/{news,downloads,about}.json` ausschließlich im Artefakt.
+- Downloads: nur `downloads/oeffentlich`; `downloads/quellen` und `.odt` werden ausgeschlossen.
+- PWA: Build erzeugt für beide Gebäude einen scope-eigenen Service Worker. Sein Cache-Key hasht Pfade und Inhalte aller Precache-Dateien. Root bleibt ohne Worker.
+- Texte: sichtbare UI-Texte kommen aus `betreiber/allgemein/texte/frontend.json`, Rechtstexte aus `rechtliches.md`; Gebäude können `frontend.json` überschreiben.
+- Backend: Google Apps Script und private Google Sheets. `scripts/build-apps-script.py` injiziert Betreiberkonfiguration/-texte in direkt deploybares `apps-script/buchungs-api/Code.gs`.
+- Runtime: `scripts/configure-runtime.py` ersetzt nur die öffentliche Apps-Script-Web-App-URL im Buildartefakt.
+
+## Betrieb
+
+- Pages: `https://Rinderbuegen.github.io/Vermietung/DGH/` und `https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/`.
+- Demo: `tools/demo-server.cmd`, Caddy/mkcert, HTTPS auf `localhost:8443` und optional im LAN.
+- Tests: `scripts/verify-pages-site.py`, `tests/content-build.test.py`, `tests/service-worker.test.js`, optional `tools/test-demo.py` mit Playwright.
+- Workflow: `.github/workflows/pages.yml` baut Apps Script und Pages, prüft vor und nach Runtime-Konfiguration und lädt nur `_site` hoch.
+
+## Datenschutz
+
+Öffentlich erscheinen nur Datum, Uhrzeit, Status und optional freigegebener Titel. Namen, Kontaktdaten, interne Notizen und Anfragehistorie bleiben im Backend. Keine vertraulichen Werte unter `betreiber/**/konfiguration/frontend.json` ablegen.

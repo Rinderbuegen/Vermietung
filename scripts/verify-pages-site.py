@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import struct
 from html.parser import HTMLParser
 from pathlib import Path
@@ -14,6 +16,7 @@ from urllib.parse import urljoin, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "_site"
 SCOPES = ("DGH", "Gemeindehaus")
+BUILDING_IDS = {"DGH": "dgh_rb", "Gemeindehaus": "ev_gem_rb"}
 FORBIDDEN_FINAL_TEXT = ("DEPLOYMENT_ID", "dgh-rb", "ev-gem-rb")
 
 
@@ -81,19 +84,39 @@ def verify_scope(scope: str) -> None:
     for item in about["items"]:
         assert local_path(base_url, item["url"], target).is_file(), f"About-Datei fehlt: {item['url']}"
 
+    config = (target / "config/config.js").read_text(encoding="utf-8")
+    assert BUILDING_IDS[scope] in config, f"{scope}: eigene Gebäude-ID fehlt"
+    foreign = BUILDING_IDS["Gemeindehaus" if scope == "DGH" else "DGH"]
+    assert foreign not in config, f"{scope}: fremde Gebäude-ID ausgeliefert"
+    for index_name in ("news.json", "downloads.json", "about.json"):
+        payload = json.loads((target / "assets/data" / index_name).read_text(encoding="utf-8"))
+        assert all(item.get("buildingId") in ("*", BUILDING_IDS[scope]) for item in payload["items"]), f"{scope}: fremder Inhalt in {index_name}"
+    assert not any(target.rglob("*.odt")), f"{scope}: ODT darf nicht veröffentlicht werden"
+    worker = (target / "service-worker.js").read_text(encoding="utf-8")
+    assert "__CACHE_HASH__" not in worker and "__STATIC_ASSETS__" not in worker
+    assert foreign not in worker, f"{scope}: Service Worker enthält fremde ID"
+    assets = json.loads(re.search(r"const STATIC_ASSETS = (\[.*?\]);", worker, re.S).group(1))
+    digest = hashlib.sha256()
+    for asset in assets:
+        path = target / asset.removeprefix("./")
+        assert path.is_file(), f"{scope}: Precache-Datei fehlt: {asset}"
+        digest.update(asset.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
+    cache_version = re.search(r'const CACHE_VERSION = "([a-f0-9]{12})";', worker).group(1)
+    assert cache_version == digest.hexdigest()[:12], f"{scope}: Cache-Key entspricht nicht den Dateiinhalten"
+
 
 def verify_service_worker_registration() -> None:
     app_source = (SITE / "assets/js/app.js").read_text(encoding="utf-8")
-    assert 'PWA_BUILDING_PATHS = ["DGH", "Gemeindehaus"]' in app_source
-    assert "PWA_BUILDING_PATHS.includes(segment)" in app_source
-    assert "buildingPaths.length === 1" in app_source
+    assert 'new URL("./", window.location.href).pathname' in app_source
     assert 'register(`${scope}service-worker.js`, { scope })' in app_source
-
-    for path in ("/Vermietung/", "/Vermietung/DGH/", "/Vermietung/Gemeindehaus/"):
-        segments = [segment for segment in path.split("/") if segment]
-        matches = [segment for segment in segments if segment in SCOPES]
-        expected = [] if path == "/Vermietung/" else [segments[-1]]
-        assert matches == expected, f"Ungültige PWA-Pfadbindung: {path}"
+    assert "config.registerServiceWorker" in app_source
+    assert "registration.unregister()" in app_source
+    assert not (SITE / "service-worker.js").exists(), "Root darf keinen übergeordneten Service Worker ausliefern"
+    root_config = (SITE / "config/config.js").read_text(encoding="utf-8")
+    assert '"registerServiceWorker": false' in root_config
+    for scope in SCOPES:
+        scope_config = (SITE / scope / "config/config.js").read_text(encoding="utf-8")
+        assert '"registerServiceWorker": true' in scope_config
 
 
 def verify_final_artifact() -> None:
@@ -102,6 +125,7 @@ def verify_final_artifact() -> None:
 
     for name in ("dgh-rb", "ev-gem-rb"):
         assert not (SITE / name).is_dir(), f"Veraltetes Verzeichnis vorhanden: {name}"
+    assert not any(SITE.rglob("*.odt")), "ODT-Quelle im finalen Artefakt"
 
     for path in SITE.rglob("*"):
         if not path.is_file():

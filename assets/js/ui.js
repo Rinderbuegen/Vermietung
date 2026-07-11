@@ -4,7 +4,8 @@
   const dateFormatter = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium" });
   const dateTimeFormatter = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" });
   const monthFormatter = new Intl.DateTimeFormat("de-DE", { month: "long", year: "numeric" });
-  const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+  const texts = (window.APP_CONFIG && window.APP_CONFIG.texts) || {};
+  const weekdays = texts.weekdays || [];
 
   function text(selector, value) {
     document.querySelectorAll(selector).forEach((node) => {
@@ -44,7 +45,7 @@
   }
 
   function renderContactDetails(selector, value) {
-    const lines = contactLines(value || "Kontakt nicht hinterlegt");
+    const lines = contactLines(value || texts.contactMissing);
     document.querySelectorAll(selector).forEach((node) => {
       node.innerHTML = lines.map((line) => {
         const email = line.match(/[^\s<>"']+@[^\s<>"']+\.[^\s<>"']+/);
@@ -61,16 +62,16 @@
   function renderOccupancy(items, loadedAt, stale) {
     const list = document.getElementById("occupancyList");
     const meta = document.getElementById("occupancyMeta");
-    meta.textContent = `${stale ? "Möglicherweise veralteter Stand" : "Stand"}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
+    meta.textContent = `${stale ? texts.statusStale : texts.statusCurrent}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
 
     if (!items.length) {
-      renderEmpty(list, "Für diesen Zeitraum sind keine Belegungen eingetragen.");
+      renderEmpty(list, texts.occupancyEmpty);
       return;
     }
 
     list.innerHTML = items.map((item) => {
       const title = item.publicTitle ? `<strong>${escapeHtml(item.publicTitle)}</strong>` : "";
-      const time = item.allDay ? "Ganzer Tag" : `${escapeHtml(item.from)} bis ${escapeHtml(item.to)} Uhr`;
+      const time = item.allDay ? texts.allDayDisplay : `${escapeHtml(item.from)} ${escapeHtml(texts.timeUntil)} ${escapeHtml(item.to)} ${escapeHtml(texts.timeSuffix)}`;
       return `
         <article class="list-item status-${escapeHtml(item.statusKey || "default")}">
           <div>
@@ -129,14 +130,14 @@
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = `${key}-${String(day).padStart(2, "0")}`;
       if (date < range.from || date > range.to) {
-        cells.push(`<span class="occupancy-day is-out-of-range" aria-label="${escapeHtml(date)}: nicht im gewählten Zeitraum">${day}</span>`);
+        cells.push(`<span class="occupancy-day is-out-of-range" aria-label="${escapeHtml(date)}: ${escapeHtml(texts.outsideRange)}">${day}</span>`);
         continue;
       }
       const status = dayStatus(itemsByDate.get(date) || []);
-      const statusLabel = status === "busy" ? "belegt" : status === "partial" ? "teilweise belegt" : "frei";
+      const statusLabel = status === "busy" ? texts.statusBusy : status === "partial" ? texts.statusPartial : texts.statusFree;
       const dayLabel = dateFormatter.format(new Date(`${date}T00:00:00`));
       if (status === "free") {
-        cells.push(`<button class="occupancy-day is-free" type="button" data-booking-date="${date}" title="Buchungsanfrage für ${escapeHtml(dayLabel)}" aria-label="${escapeHtml(dayLabel)}: frei, Buchungsanfrage starten">${day}</button>`);
+        cells.push(`<button class="occupancy-day is-free" type="button" data-booking-date="${date}" title="${escapeHtml(texts.bookingFor)} ${escapeHtml(dayLabel)}" aria-label="${escapeHtml(dayLabel)}: ${escapeHtml(texts.statusFree)}, ${escapeHtml(texts.startBooking)}">${day}</button>`);
         continue;
       }
       cells.push(`<span class="occupancy-day is-${status}" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(dayLabel)}: ${escapeHtml(statusLabel)}">${day}</span>`);
@@ -144,7 +145,7 @@
 
     return `
       <article class="occupancy-month">
-        <button class="occupancy-month-title" type="button" data-occupancy-month="${key}" data-occupancy-month-label="${escapeHtml(label)}" aria-label="${escapeHtml(label)} tabellarisch anzeigen">${escapeHtml(label)}</button>
+        <button class="occupancy-month-title" type="button" data-occupancy-month="${key}" data-occupancy-month-label="${escapeHtml(label)}" aria-label="${escapeHtml(label)} ${escapeHtml(texts.showAsTable)}">${escapeHtml(label)}</button>
         <div class="occupancy-weekdays" aria-hidden="true">${weekdays.map((day) => `<span>${day}</span>`).join("")}</div>
         <div class="occupancy-days">${cells.join("")}</div>
       </article>`;
@@ -158,28 +159,28 @@
       map.get(item.date).push(item);
       return map;
     }, new Map());
-    meta.textContent = `${stale ? "Möglicherweise veralteter Stand" : "Stand"}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
+    meta.textContent = `${stale ? texts.statusStale : texts.statusCurrent}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
     list.innerHTML = `
-      <div class="occupancy-plan" aria-label="Belegungsplan">
+      <div class="occupancy-plan" aria-label="${escapeHtml(texts.occupancyPlanLabel)}">
         ${monthsInRange(range).map((month) => renderMonth(month, itemsByDate, range)).join("")}
       </div>
-      <div class="occupancy-legend" aria-label="Legende">
-        <span><i class="is-free"></i> frei</span>
-        <span><i class="is-busy"></i> belegt</span>
-        <span><i class="is-partial"></i> teilweise belegt</span>
+      <div class="occupancy-legend" aria-label="${escapeHtml(texts.legendLabel)}">
+        <span><i class="is-free"></i> ${escapeHtml(texts.statusFree)}</span>
+        <span><i class="is-busy"></i> ${escapeHtml(texts.statusBusy)}</span>
+        <span><i class="is-partial"></i> ${escapeHtml(texts.statusPartial)}</span>
       </div>`;
   }
 
   function renderNews(items) {
     const list = document.getElementById("newsList");
     if (!items.length) {
-      renderEmpty(list, "Aktuell liegen keine Hinweise vor.");
+      renderEmpty(list, texts.newsEmpty);
       return;
     }
     list.innerHTML = items.map((item) => `
       <article class="list-item news-type-${escapeHtml(item.type || "info")}">
         <div>
-          <p class="meta">${escapeHtml(item.type || "info")} · ${item.date ? dateFormatter.format(new Date(item.date)) : "ohne Datum"}</p>
+          <p class="meta">${escapeHtml(item.type || "info")} · ${item.date ? dateFormatter.format(new Date(item.date)) : escapeHtml(texts.withoutDate)}</p>
           <h3>${escapeHtml(item.title)}</h3>
           <div class="markdown"><p>${markdown(item.body || "")}</p></div>
         </div>
@@ -189,38 +190,38 @@
   function renderDownloads(items) {
     const list = document.getElementById("downloadsList");
     if (!items.length) {
-      renderEmpty(list, "Aktuell sind keine PDF-Downloads hinterlegt.");
+      renderEmpty(list, texts.downloadsEmpty);
       return;
     }
     list.innerHTML = items.map((item) => `
       <article class="list-item">
         <div>
           <h3>${escapeHtml(item.title)}</h3>
-          <p>${escapeHtml(item.description || "PDF-Dokument")}</p>
-          ${item.updatedAt ? `<p class="meta">Aktualisiert: ${dateTimeFormatter.format(new Date(item.updatedAt))}</p>` : ""}
+          <p>${escapeHtml(item.description || texts.pdfDocument)}</p>
+          ${item.updatedAt ? `<p class="meta">${escapeHtml(texts.updatedItemLabel)} ${dateTimeFormatter.format(new Date(item.updatedAt))}</p>` : ""}
         </div>
-        <a class="button button-secondary" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">PDF öffnen</a>
+        <a class="button button-secondary" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(texts.openPdf)}</a>
       </article>`).join("");
   }
 
   function applyConfig(config) {
-    text("[data-app-title]", config.appTitle || "Gebäudevermietung");
-    text("[data-building-name]", config.buildingName || config.appTitle || "Gebäude");
-    text("[data-hero-title]", config.heroTitle || config.buildingName || config.appTitle || "Gebäude");
+    text("[data-app-title]", config.appTitle || texts.defaultAppTitle);
+    text("[data-building-name]", config.buildingName || config.appTitle || texts.defaultBuilding);
+    text("[data-hero-title]", config.heroTitle || config.buildingName || config.appTitle || texts.defaultBuilding);
     text("[data-hero-location]", config.heroLocation || "");
-    text("[data-operator-name]", config.operatorName || "Betreiber");
+    text("[data-operator-name]", config.operatorName || texts.defaultOperator);
     renderContactDetails("[data-contact-details]", config.contactDetails || config.contactEmail);
     document.querySelectorAll("[data-building-id-field]").forEach((field) => {
       field.value = config.buildingId || "";
     });
-    document.title = config.appTitle || "Gebäudevermietung";
+    document.title = config.appTitle || texts.defaultAppTitle;
   }
 
   function setConnectionStatus() {
     const node = document.getElementById("connectionStatus");
     if (!node) return;
     node.hidden = navigator.onLine;
-    node.textContent = navigator.onLine ? "" : "Offline. Es wird möglicherweise ein älterer Stand angezeigt.";
+    node.textContent = navigator.onLine ? "" : texts.offline;
     node.className = "status-pill is-offline";
   }
 
