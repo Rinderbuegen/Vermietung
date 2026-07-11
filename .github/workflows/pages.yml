@@ -25,8 +25,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: python scripts/build-content-index.py
       - run: python scripts/build-pages-site.py
+      - run: python scripts/verify-pages-site.py
+      - run: node tests/service-worker.test.js
       - name: Configure runtime
         env:
           APPS_SCRIPT_WEB_APP_URL: ${{ secrets.APPS_SCRIPT_WEB_APP_URL }}

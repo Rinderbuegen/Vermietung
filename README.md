@@ -83,8 +83,8 @@ Außerdem erzeugt sie die festen Unterseiten `DGH/` und `Gemeindehaus/`.
 Produktive Links:
 
 ```text
-https://Rinderbuegen.github.io/vermietung/DGH/
-https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
+https://Rinderbuegen.github.io/Vermietung/DGH/
+https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/
 ```
 
 Der Code bleibt trotzdem nur einmal vorhanden. Die GitHub-Action erzeugt die zwei Unterseiten beim Deployment automatisch.

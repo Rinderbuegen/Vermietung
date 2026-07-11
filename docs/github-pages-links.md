@@ -9,14 +9,14 @@ Die Nutzer sollen keinen URL-Parameter eintippen. Deshalb erzeugt die GitHub-Act
 GitHub-Pages-Basislink:
 
 ```text
-https://Rinderbuegen.github.io/vermietung/
+https://Rinderbuegen.github.io/Vermietung/
 ```
 
 Gebäudelinks:
 
 ```text
-https://Rinderbuegen.github.io/vermietung/DGH/
-https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
+https://Rinderbuegen.github.io/Vermietung/DGH/
+https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/
 ```
 
 Vorteile:

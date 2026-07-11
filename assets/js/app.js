@@ -2,6 +2,7 @@
   "use strict";
 
   const config = window.APP_CONFIG || {};
+  const PWA_BUILDING_PATHS = ["DGH", "Gemeindehaus"];
   let currentOccupancyPayload = null;
   let currentOccupancyRange = null;
 
@@ -352,8 +353,12 @@
     loadNews();
     loadDownloads();
     loadAbout();
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./service-worker.js").catch(console.warn);
+    const pathSegments = window.location.pathname.split("/").filter(Boolean);
+    const buildingPaths = pathSegments.filter((segment) => PWA_BUILDING_PATHS.includes(segment));
+    if ("serviceWorker" in navigator && buildingPaths.length === 1) {
+      const buildingIndex = pathSegments.indexOf(buildingPaths[0]);
+      const scope = `/${pathSegments.slice(0, buildingIndex + 1).join("/")}/`;
+      navigator.serviceWorker.register(`${scope}service-worker.js`, { scope }).catch(console.warn);
     }
   });
 

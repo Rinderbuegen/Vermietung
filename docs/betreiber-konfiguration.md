@@ -5,8 +5,8 @@
 Beide Gebäude laufen über ein einziges GitHub-Pages-Repository. Das Gebäude wird über feste Pfade ausgewählt:
 
 ```text
-https://Rinderbuegen.github.io/vermietung/DGH/
-https://Rinderbuegen.github.io/vermietung/Gemeindehaus/
+https://Rinderbuegen.github.io/Vermietung/DGH/
+https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/
 ```
 
 Die GitHub-Action erzeugt diese Unterseiten automatisch aus derselben Codebasis. Ohne Pfad verwendet die App den Standardpfad aus `config/config.js`, aktuell `DGH`.
