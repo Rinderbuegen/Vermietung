@@ -58,11 +58,21 @@
     return { ...payload, items };
   }
 
+  async function getAbout() {
+    const data = await getLocalContent("about.json");
+    const item = data.items[0];
+    if (!item) throw new Error("Kein Über-Dokument hinterlegt.");
+    const response = await fetch(item.url, { cache: "no-cache" });
+    if (!response.ok) throw new Error("Das Über-Dokument konnte nicht geladen werden.");
+    return await response.text();
+  }
+
   window.Api = {
     getBuilding: () => get("building"),
     getOccupancy: (from, to) => get("occupancy", { from, to }),
     getNews: () => getLocalContent("news.json"),
     getDownloads: () => getLocalContent("downloads.json"),
+    getAbout,
     createBookingRequest: (data) => post("createBookingRequest", data),
     createContactRequest: (data) => post("createContactRequest", data)
   };

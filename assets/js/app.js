@@ -209,6 +209,16 @@
     }
   }
 
+  async function loadAbout() {
+    try {
+      const text = await window.Api.getAbout();
+      window.Ui.renderAbout(text);
+    } catch (error) {
+      const container = document.getElementById("aboutContent");
+      if (container) container.innerHTML = `<p class="empty">Über-Dokument konnte nicht geladen werden: ${window.Ui.escapeHtml(error.message)}</p>`;
+    }
+  }
+
   function bindForms() {
     document.getElementById("occupancyFilter").addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -341,6 +351,7 @@
     loadOccupancy();
     loadNews();
     loadDownloads();
+    loadAbout();
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("./service-worker.js").catch(console.warn);
     }

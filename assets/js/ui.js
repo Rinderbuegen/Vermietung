@@ -224,6 +224,12 @@
     node.className = "status-pill is-offline";
   }
 
+  function renderAbout(markdownText) {
+    const container = document.getElementById("aboutContent");
+    if (!container) return;
+    container.innerHTML = `<p>${markdown(markdownText)}</p>`;
+  }
+
   window.Ui = {
     applyConfig,
     setConnectionStatus,
@@ -231,6 +237,7 @@
     renderOccupancyPlan,
     renderNews,
     renderDownloads,
+    renderAbout,
     renderEmpty,
     escapeHtml
   };

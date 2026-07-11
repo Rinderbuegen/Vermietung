@@ -8,6 +8,7 @@ No external dependencies. Scans:
 - news/<buildingId>/**/*.md
 - news/common/**/*.md
 - news/*.md
+- about/<buildingId>/**/*.md
 
 PDF metadata is read from the PDF Info dictionary when present. Markdown
 metadata is read from a simple YAML-like frontmatter block.
@@ -25,6 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOWNLOADS_DIR = ROOT / "downloads"
 NEWS_DIR = ROOT / "news"
+ABOUT_DIR = ROOT / "about"
 DATA_DIR = ROOT / "assets" / "data"
 
 
@@ -138,6 +140,23 @@ def scan_news() -> list[dict]:
     return items
 
 
+def scan_about() -> list[dict]:
+    items: list[dict] = []
+    if not ABOUT_DIR.exists():
+        return items
+    for path in sorted(ABOUT_DIR.rglob("*.md")):
+        if path.parent == ABOUT_DIR:
+            continue
+        meta, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+        building_id = str(meta.get("building_id") or meta.get("buildingId") or building_id_for(path, ABOUT_DIR))
+        items.append({
+            "buildingId": building_id,
+            "url": posix(path),
+            "updatedAt": iso_mtime(path),
+        })
+    return items
+
+
 def write_json(name: str, items: list[dict]) -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -150,6 +169,7 @@ def write_json(name: str, items: list[dict]) -> None:
 def main() -> None:
     write_json("downloads.json", scan_downloads())
     write_json("news.json", scan_news())
+    write_json("about.json", scan_about())
     print("Content indexes written to assets/data")
 
 

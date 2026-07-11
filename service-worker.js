@@ -1,4 +1,4 @@
-const CACHE_NAME = "vermietung-v14";
+const CACHE_NAME = "vermietung-v15";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -12,7 +12,8 @@ const STATIC_ASSETS = [
   "./assets/js/ui.js",
   "./assets/js/app.js",
   "./assets/data/news.json",
-  "./assets/data/downloads.json"
+  "./assets/data/downloads.json",
+  "./assets/data/about.json"
 ];
 
 self.addEventListener("install", (event) => {
