@@ -41,6 +41,9 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 - `assets/data/downloads.json`: automatisch erzeugter Downloadindex.
 - `apps-script/Code.gs`: Google-Apps-Script-Backend.
 - `docs/`: Betriebsdokumentation.
+- `AGENTS.md`: Projektanweisungen zum automatischen Laden passender Skills.
+- `docs/SkillsOverview.md`: Übersicht aller verfügbaren projektlokalen, globalen und eingebauten Skills mit Dokumentation und Beispielen.
+- `skills-lock.json`: Quellen und Prüfsummen der projektlokal installierten Skills.
 
 ## Stand
 
