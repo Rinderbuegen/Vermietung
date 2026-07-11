@@ -1,6 +1,6 @@
 /**
- * Buchungsverwaltung – gebundenes Google-Apps-Script
- * ===================================================
+ * Buchungsverwaltung – gebundenes Google-Apps-Script - V1
+ * =======================================================
  *
  * Dieses Script gehört direkt in das Gebäude-Spreadsheet
  * (Erweiterungen → Apps Script). Es erzeugt das Menü "Buchungen"
