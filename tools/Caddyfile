@@ -1,0 +1,26 @@
+{
+	auto_https disable_redirects
+}
+
+https://:8443 {
+	tls "{$DEMO_CERT_FILE}" "{$DEMO_KEY_FILE}"
+
+	@root path /
+	redir @root /Vermietung/ 308
+
+	@prefix path /Vermietung
+	redir @prefix /Vermietung/ 308
+
+	@dgh path /Vermietung/DGH
+	redir @dgh /Vermietung/DGH/ 308
+
+	@gemeindehaus path /Vermietung/Gemeindehaus
+	redir @gemeindehaus /Vermietung/Gemeindehaus/ 308
+
+	handle_path /Vermietung/* {
+		root * "{$DEMO_SITE_ROOT}"
+		file_server
+	}
+
+	respond 404
+}

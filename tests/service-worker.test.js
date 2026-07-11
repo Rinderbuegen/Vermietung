@@ -93,11 +93,11 @@ function getRequest(url, overrides = {}) {
 
   const dghCache = dgh.opened[0];
   const gemeindehausCache = gemeindehaus.opened[0];
-  assert.match(dghCache, /v16$/);
-  assert.match(gemeindehausCache, /v16$/);
+  assert.match(dghCache, /v17$/);
+  assert.match(gemeindehausCache, /v17$/);
   assert.notEqual(dghCache, gemeindehausCache, "Scopes dürfen keinen Cache teilen");
 
-  const oldDghCache = dghCache.replace(/v16$/, "v15");
+  const oldDghCache = dghCache.replace(/v17$/, "v15");
   const activation = worker(dghScope, {
     cacheNames: [oldDghCache, dghCache, gemeindehausCache, "fremde-anwendung-v1", "vermietung-v15"],
   });

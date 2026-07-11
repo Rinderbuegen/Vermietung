@@ -26,19 +26,27 @@ ev_gem_rb -> Evangelisches Gemeindehaus Rinderbügen
 
 Beide Gebäude nutzen dieselbe Apps-Script-Schnittstelle. Die Zuordnung zum richtigen Spreadsheet erfolgt im Apps Script über `buildingId`.
 
-## Lokal Testen
+## Lokale Demo
 
-Direktes Öffnen per Datei funktioniert teilweise, Service Worker und manche Browserfunktionen brauchen aber HTTP.
+Die produktionsnahe lokale Demo wird unter Windows über `tools/demo-server.cmd` gestartet. Das Werkzeug baut dieselbe Pfadstruktur wie GitHub Pages und stellt sie mit Caddy und einem von mkcert erzeugten lokalen HTTPS-Zertifikat bereit. Dadurch lassen sich Service Worker, PWA-Verhalten und Tests auf anderen Geräten im privaten LAN sinnvoll prüfen.
+
+Voraussetzungen sind Windows mit `winget`, Python 3 und Node.js. Die Apps-Script-URL wird nur für die aktuelle PowerShell-Sitzung gesetzt:
 
 ```pwsh
-python -m http.server 8080
+$env:APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/.../exec"
+tools\demo-server.cmd
 ```
 
 Danach öffnen:
 
 ```text
-http://localhost:8080
+https://localhost:8443/Vermietung/DGH/
+https://localhost:8443/Vermietung/Gemeindehaus/
 ```
+
+Die frühere Anleitung mit `python -m http.server` wurde ersetzt: Ein einfacher HTTP-Server bildet HTTPS, Zertifikatsvertrauen, LAN-Zugriff und PWA-Sicherheitsanforderungen nicht ausreichend ab.
+
+Ausführliche Anleitung einschließlich Installation, LAN-IP, Firewall, Android/iOS, CA-Entfernung, Build, GitHub Actions, Playwright und Fehlerbehebung: [`docs/lokaler-demo-server.md`](docs/lokaler-demo-server.md).
 
 ## Konfiguration
 
@@ -99,16 +107,16 @@ APPS_SCRIPT_WEB_APP_URL = https://script.google.com/macros/s/.../exec
 
 Die Apps-Script-Web-App-URL ist in der ausgelieferten statischen App öffentlich sichtbar. Das Secret verhindert nur, dass die URL im öffentlichen Repository steht.
 
-Lokal kann dieselbe Ausgabe erzeugt werden:
+Lokal erzeugt `tools/demo-server.cmd` dieselbe Ausgabe und stellt sie über HTTPS bereit. Zuvor die URL nur für die aktuelle Sitzung setzen:
 
 ```pwsh
-python scripts/build-content-index.py
-python scripts/build-pages-site.py
-python scripts/configure-runtime.py "https://script.google.com/macros/s/.../exec" _site
-python -m http.server 8080 --directory _site
+$env:APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/.../exec"
+tools\demo-server.cmd
 ```
 
-Danach öffnen: `http://localhost:8080/DGH/` und `http://localhost:8080/Gemeindehaus/`.
+Danach öffnen: `https://localhost:8443/Vermietung/DGH/` und `https://localhost:8443/Vermietung/Gemeindehaus/`.
+
+**Produktionswarnung:** Verweist `APPS_SCRIPT_WEB_APP_URL` auf die produktive Web-App, können Formularaufrufe echte Daten in den produktiven Google Sheets anlegen. Für Formular- und Automatisierungstests eine getrennte Testbereitstellung mit Testtabellen verwenden.
 
 PDFs werden abgelegt unter:
 
@@ -140,7 +148,7 @@ Nicht öffentlich ausgegeben werden Name, E-Mail, Telefonnummer, interne Notizen
 
 Vor Veröffentlichung müssen Betreiber die Platzhalter für Datenschutz und Impressum in `index.html` ersetzen oder ergänzen.
 
-## Nicht Enthalten In Version 1
+## Nicht Enthalten In Version 1.1
 
 - keine Adminoberfläche
 - keine Benutzerverwaltung

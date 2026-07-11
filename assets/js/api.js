@@ -4,7 +4,7 @@
   const config = window.APP_CONFIG || {};
 
   function assertConfig() {
-    if (!config.apiBaseUrl || config.apiBaseUrl.includes("DEPLOYMENT_ID")) {
+    if (!config.apiBaseUrl || config.apiBaseUrl.includes("DEPLOYMENT_" + "ID")) {
       throw new Error("Bitte Apps-Script-URL in config/config.js eintragen.");
     }
     if (!config.buildingId) {

@@ -37,21 +37,30 @@ Die App erkennt den Pfad:
 
 Die globale Datei `config/config.js` enthält gemeinsame Werte. Gebäudespezifische Werte stehen getrennt in `config/DGH/config.js` und `config/Gemeindehaus/config.js`. Die GitHub-Action kopiert dieselbe App nach `DGH/` und `Gemeindehaus/`.
 
-Lokal kann dieselbe Ausgabe erzeugt werden:
+## Lokale Links Mit Derselben Pfadstruktur
+
+`tools/demo-server.cmd` baut `_site/` mit denselben Skripten wie GitHub Actions und stellt die beiden Scopes über lokales HTTPS bereit. In PowerShell gilt die Apps-Script-URL nur für die aktuelle Sitzung:
 
 ```pwsh
-python scripts/build-content-index.py
-python scripts/build-pages-site.py
-python scripts/configure-runtime.py "https://script.google.com/macros/s/.../exec" _site
-python -m http.server 8080 --directory _site
+$env:APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/.../exec"
+tools\demo-server.cmd
 ```
 
-Danach testen:
+Danach lokal testen:
 
 ```text
-http://localhost:8080/DGH/
-http://localhost:8080/Gemeindehaus/
+https://localhost:8443/Vermietung/DGH/
+https://localhost:8443/Vermietung/Gemeindehaus/
 ```
+
+Auf einem Gerät im selben privaten LAN wird `localhost` durch die angezeigte LAN-IP des Demo-Servers ersetzt, zum Beispiel:
+
+```text
+https://192.168.178.20:8443/Vermietung/DGH/
+https://192.168.178.20:8443/Vermietung/Gemeindehaus/
+```
+
+Vollständige Anleitung zu Voraussetzungen, Caddy, mkcert, Firewall, Mobilgeräten, Zertifikaten und Tests: [`lokaler-demo-server.md`](lokaler-demo-server.md).
 
 ## GitHub-Konfiguration
 
@@ -59,8 +68,10 @@ http://localhost:8080/Gemeindehaus/
 - `Settings -> Secrets and variables -> Actions -> Secrets`: `APPS_SCRIPT_WEB_APP_URL` mit der Apps-Script-Web-App-URL `/exec` anlegen.
 - Das Secret verhindert nur, dass die URL im öffentlichen Repository steht. Im ausgelieferten JavaScript ist sie weiter sichtbar.
 - Der Workflow nutzt keine weiteren Secrets.
-- 1. Repo öffnen: https://github.com/Rinderbuegen/Vermietung
-  2. Settings -> Pages
-  3. Bei Build and deployment
-  4. Source: GitHub Actions
-  5. Speichern
+
+Einrichtung:
+
+1. Repository `https://github.com/Rinderbuegen/Vermietung` öffnen.
+2. `Settings -> Pages` öffnen.
+3. Unter `Build and deployment` als `Source` den Wert `GitHub Actions` wählen.
+4. Speichern.

@@ -12,6 +12,7 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 
 - Frontend: HTML, CSS, Vanilla JavaScript.
 - Hosting: GitHub Pages.
+- Lokale Demo: `tools/demo-server.cmd` baut `_site/` und stellt beide Gebäudepfade mit Caddy und mkcert unter HTTPS auf `localhost:8443` sowie im privaten LAN bereit.
 - Repository: `https://github.com/Rinderbuegen/Vermietung`.
 - Pages-Pfade: `https://Rinderbuegen.github.io/Vermietung/DGH/` und `https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/`.
 - Backend/API: Google Apps Script Web-App.
@@ -37,6 +38,10 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 - `scripts/build-content-index.py`: erzeugt lokale Inhaltsindizes für Hinweise und PDFs.
 - `scripts/build-pages-site.py`: erzeugt `_site/`, `DGH/` und `Gemeindehaus/` für GitHub Pages.
 - `scripts/configure-runtime.py`: setzt die öffentliche Apps-Script-Web-App-URL vor dem Deployment.
+- `tools/demo-server.cmd` und `tools/demo-server.ps1`: Windows-Einstiegspunkt und Ablauf für lokalen Build, Prüfung und HTTPS-Demo mit Caddy und mkcert.
+- `tools/Caddyfile`: HTTPS-, Pfad-, Redirect- und Dateiserver-Konfiguration der lokalen Demo.
+- `tools/test-demo.py`: Playwright-Prüfung beider Gebäude, PWA-Scopes, Redirects und 404-Antworten.
+- `docs/lokaler-demo-server.md`: Bedienung, Voraussetzungen, Zertifikate, Mobilgeräte, Tests und Fehlerbehebung der lokalen Demo.
 - `assets/data/news.json`: automatisch erzeugter Hinweisindex.
 - `assets/data/downloads.json`: automatisch erzeugter Downloadindex.
 - `apps-script/Code.gs`: Google-Apps-Script-Backend.
@@ -47,7 +52,7 @@ Einfaches Werkzeug für Betreiber, die Daten weiter direkt in Google Sheets pfle
 
 ## Stand
 
-Version 1 ist bewusst klein gehalten. Normale Nutzer erzeugen nur offene Anfragen. Betreiber entscheiden im Google Sheet.
+Version 1.1 ist bewusst klein gehalten. Normale Nutzer erzeugen nur offene Anfragen. Betreiber entscheiden im Google Sheet.
 
 Desktop-Layout: Bei ausreichender Breite und Höhe bleiben Kopfbereich und Footer sichtbar; nur der Hauptbereich scrollt.
 

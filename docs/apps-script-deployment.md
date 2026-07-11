@@ -177,17 +177,7 @@ Wenn Hinweise oder PDFs lokal ergänzt wurden, zuerst den Index erzeugen:
 python scripts/build-content-index.py
 ```
 
-Dann lokalen Server starten:
-
-```pwsh
-python -m http.server 8080
-```
-
-Öffnen:
-
-```text
-http://localhost:8080
-```
+Danach die lokale Demo mit `tools\demo-server.cmd` starten. Voraussetzungen und Aufruf sind in `docs/lokaler-demo-server.md` beschrieben.
 
 Prüfen:
 

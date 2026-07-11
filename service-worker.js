@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v16";
+const CACHE_VERSION = "v17";
 const SCOPE_URL = new URL(self.registration.scope);
 const SCOPE_KEY = encodeURIComponent(SCOPE_URL.pathname.replace(/\/$/, "") || "/");
 const CACHE_PREFIX = `vermietung-${SCOPE_KEY}-`;

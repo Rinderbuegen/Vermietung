@@ -7,3 +7,4 @@ _LaunchOpenCodeHere.cmd
 _site/
 __pycache__/
 *.py[cod]
+tools/.certs/

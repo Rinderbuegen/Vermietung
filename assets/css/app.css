@@ -504,7 +504,8 @@ button.occupancy-day.is-free:hover { background: #e0e0e0; outline: 2px solid var
   .hero-grid { grid-template-columns: 1fr; }
   .section-head { position: static; padding-left: 0; }
   .filter-bar,
-  .form-grid { grid-template-columns: 1fr; }
+  .form-grid,
+  .legal-grid { grid-template-columns: 1fr; }
   .list-item { align-items: flex-start; flex-direction: column; }
   .occupancy-plan { grid-template-columns: 1fr; }
 }

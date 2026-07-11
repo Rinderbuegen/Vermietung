@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import struct
 from html.parser import HTMLParser
@@ -13,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "_site"
 SCOPES = ("DGH", "Gemeindehaus")
+FORBIDDEN_FINAL_TEXT = ("DEPLOYMENT_ID", "dgh-rb", "ev-gem-rb")
 
 
 class LinkParser(HTMLParser):
@@ -94,11 +96,45 @@ def verify_service_worker_registration() -> None:
         assert matches == expected, f"Ungültige PWA-Pfadbindung: {path}"
 
 
+def verify_final_artifact() -> None:
+    for scope in SCOPES:
+        assert (SITE / scope / "index.html").is_file(), f"Finale Startseite fehlt: {scope}/index.html"
+
+    for name in ("dgh-rb", "ev-gem-rb"):
+        assert not (SITE / name).is_dir(), f"Veraltetes Verzeichnis vorhanden: {name}"
+
+    for path in SITE.rglob("*"):
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        if b"\0" in data:
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if any(ord(char) < 32 and char not in "\t\n\r" for char in text):
+            continue
+        for forbidden in FORBIDDEN_FINAL_TEXT:
+            assert forbidden not in text, f"Verbotener Text '{forbidden}' gefunden: {path.relative_to(SITE)}"
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Prüft das erzeugte GitHub-Pages-Artefakt.")
+    parser.add_argument(
+        "--final-artifact",
+        action="store_true",
+        help="verlangt ein vollständig konfiguriertes, von alten Pfaden bereinigtes Artefakt",
+    )
+    args = parser.parse_args()
+
     for scope in SCOPES:
         verify_scope(scope)
     verify_service_worker_registration()
-    print("Pages-Artefakt geprüft: DGH und Gemeindehaus sind eigenständig.")
+    if args.final_artifact:
+        verify_final_artifact()
+    result = "eigenständig und final" if args.final_artifact else "eigenständig"
+    print(f"Pages-Artefakt geprüft: DGH und Gemeindehaus sind {result}.")
 
 
 if __name__ == "__main__":

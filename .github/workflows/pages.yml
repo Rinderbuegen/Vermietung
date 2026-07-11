@@ -41,16 +41,8 @@ jobs:
             exit 1
           fi
           python scripts/configure-runtime.py "$APPS_SCRIPT_WEB_APP_URL" _site
-      - name: Verify Pages artifact
-        run: |
-          test -f _site/DGH/index.html
-          test -f _site/Gemeindehaus/index.html
-          test ! -d _site/dgh-rb
-          test ! -d _site/ev-gem-rb
-          if grep -R "script.google.com/macros/s/DEPLOYMENT_ID/exec\|dgh-rb\|ev-gem-rb" _site; then
-            echo "::error::Pages artifact enthält alte Pfade oder Platzhalter."
-            exit 1
-          fi
+      - name: Verify final Pages artifact
+        run: python scripts/verify-pages-site.py --final-artifact
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
