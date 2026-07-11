@@ -1,12 +1,13 @@
 # Über dieses Angebot
 
-Dieser kleine Webauftritt wird privat von Monika und Peter Heß betrieben. Es handelt sich im ein inoffizielles Werkzeug um allen Beteiligten der Vermietung des Dorfgemeinschaftshauses (kurz DGB) aktuelle Informationen zur Verfügung zu stellen.
+Dieser kleine Webauftritt wird privat von Monika und Peter Heß betrieben. Es handelt sich um ein inoffizielles Angebot, das allen Beteiligten an der Vermietung des Dorfgemeinschaftshauses in Rinderbügen, kurz DGH, aktuelle und wichtige Informationen zur Verfügung stellen soll.
 
-Das Dorfgemeinschaftshaus in Rinderbügen gehört der Stadt Büdingen. Im Rahmen ihres Ehrenamtes "Außenstellenbeauftragte der Stadt Büdingen für Rinderbügen" hat Monika Heß die Aufgabe die Vermietung des zu koordinieren. Im Rahmen dieser Tätigkeit ist der Wunsch entstanden eine kleine Plattform zu haben, die allen Beteiligen schnell notwendige Informationen an die Hand gibt.
+Das Dorfgemeinschaftshaus in Rinderbügen gehört der Stadt Büdingen. Im Rahmen ihres Ehrenamtes als Außenstellenbeauftragte der Stadt Büdingen für Rinderbügen ist Monika Heß unter anderem für die Koordination der Vermietungen zuständig. Aus dieser Tätigkeit heraus entstand der Wunsch nach einer kleinen Plattform, über die alle Beteiligten schnell und unkompliziert auf die notwendigen Informationen zugreifen können.
 
-Eine Vermietung ist nur Bestätigt, wenn ein offizieller Mietvertrag abgeschlossen ist. Dies erfolgt bis auf Weiteres  weiterhin mit Papier und Stift offline. :-) Erst dann wird eine Belegung hier angezeigt.
+Eine Vermietung gilt erst dann als verbindlich bestätigt, wenn ein offizieller Mietvertrag abgeschlossen wurde. Dies erfolgt bis auf Weiteres weiterhin offline mit Papier und Stift. Erst danach wird die entsprechende Belegung auf dieser Seite angezeigt.
 
-Wir geben keinerlei Auskünfte über Mieter hier an. Belegt ist Belegt. Tage mit Teilbelegungen bitte immer direkt mit Monika Heß klären. Es gibt im DGH die Regel, dass die Belegung für regelmäßige Treffen für eine Vermietung durchaus gekippt werden kann. Dies ist aber eine Frage der Abstimmung und kann hier nicht behandelt werden.
+Auskünfte über Mieterinnen und Mieter werden auf dieser Seite grundsätzlich nicht erteilt. Angezeigt wird lediglich, ob das Dorfgemeinschaftshaus belegt ist. Belegt ist belegt. Termine mit Teilbelegungen sind daher immer direkt mit Monika Heß abzustimmen.
 
-Rückwirkend kann dieses System keinerlei Informationen liefern, da alle Daten am Tag nach der Vermietung vollständig gelöscht werden.
+Für regelmäßige Treffen im Dorfgemeinschaftshaus gilt, dass bereits vorgesehene Belegungen unter bestimmten Umständen zugunsten einer Vermietung geändert werden können. Dies ist jedoch stets eine Frage der individuellen Abstimmung und kann über diese Plattform nicht verbindlich geklärt werden.
 
+Dieses System kann rückwirkend keine Informationen über frühere Belegungen liefern. Sämtliche Belegungsdaten werden am Tag nach der jeweiligen Nutzung vollständig gelöscht.
