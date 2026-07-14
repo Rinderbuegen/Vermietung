@@ -118,7 +118,7 @@ Weiße Karte mitrand und Schatten:
 
 - `list-item`: Belegung, Hinweis oder Download.
 - Datum-Label: Hintergrund `#6c0e15`, Text weiß, eckig.
-- Buchungsdetailkarte: eckiges Datum-Label, Zeit, Statusbadge und nur bei Freigabe die Blöcke „Veranstaltung“ und „Veranstalter“.
+- Buchungsdetailkarte: eckiges Datum-Label, Zeit und nur bei Freigabe die Blöcke „Veranstaltung“ und „Veranstalter“. Bestätigte Einträge zeigen keinen redundanten Badge „belegt“; gesperrte und unbekannte Status behalten einen sichtbaren Badge.
 - `blocked` verwendet immer die rote Statusfarbe, auch als ganztägiger Kalenderstatus und in der Legende.
 
 ### Buchungsdetails und Dialog
@@ -145,6 +145,16 @@ Der Renderer baut nur `p`, `br`, `strong`, `em`, `a` und den Screenreader-Hinwei
 .booking-expired { background-color: #bbb; color: #fff; }    /* abgelaufen */
 ```
 
+Kalender, Legende und ARIA-Texte verwenden für bestätigte Tage weiterhin „belegt“.
+
+### Druckansicht
+
+- „PDF erstellen / drucken“ öffnet den Browser-Druckdialog; eine PDF-Datei wird nicht direkt erzeugt.
+- Der Ausdruck basiert auf einem eingefrorenen Snapshot bereits geladener öffentlicher Belegungsdaten und enthält keine Formulare, Dialog- oder privaten Anfragedaten.
+- A4-Hochformat mit vollständig lesbarem Kopf: Gebäude, Zeitraum, Ansicht, Datenstand und Erstellungszeit; Offline- und möglicherweise veraltete Daten werden deutlich markiert.
+- Die Listenansicht druckt nur die Belegungsliste. Die Planansicht druckt Kalender und Legende, danach die Detailliste mit Seitenumbruch.
+- Status bleiben auch ohne Hintergrundfarben durch Rahmen, Muster und Kürzel unterscheidbar. Monatskarten und Detaileinträge werden nicht getrennt.
+
 ### Formulare
 
 - Eingabefelder: Hintergrund `#f0f0f0`, Rahmenlos.
@@ -154,7 +164,7 @@ Der Renderer baut nur `p`, `br`, `strong`, `em`, `a` und den Screenreader-Hinwei
 ## Statusfarben
 
 - `frei`: hellgrau (`#eee`).
-- `belegt`: Primärfarbe des Gebäudes, wie der Tabellen-Badge für bestätigte Belegung.
+- `belegt`: Primärfarbe des Gebäudes für bestätigte Kalender- und Legendenstatus.
 - `teilweise belegt`: diagonal geteilt, oben hellgrau wie frei, unten Primärfarbe wie belegt.
 - `gesperrt`: rot (`#c20000`), nicht verfügbar.
 - `abgelaufen`: grau (`#bbb`), nicht mehr gültig.

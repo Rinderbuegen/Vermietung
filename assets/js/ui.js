@@ -63,7 +63,8 @@
     if (status === "blocked") return texts.statusBlocked;
     if (status === "partial") return texts.statusPartial;
     if (status === "busy" || status === "confirmed") return texts.statusBusy;
-    return texts.statusFree;
+    if (status === "free") return texts.statusFree;
+    return texts.statusUnknown || "Status unbekannt";
   }
 
   function detailText(value) {
@@ -81,10 +82,13 @@
     const time = document.createElement("p");
     time.className = "booking-time";
     time.textContent = item.allDay ? texts.allDayDisplay : `${item.from} ${texts.timeUntil} ${item.to} ${texts.timeSuffix}`;
-    const status = document.createElement("span");
-    status.className = `status-label status-${item.statusKey || "default"}`;
-    status.textContent = item.status || statusText(item.statusKey);
-    header.append(date, time, status);
+    header.append(date, time);
+    if (item.statusKey !== "confirmed") {
+      const status = document.createElement("span");
+      status.className = `status-label status-${item.statusKey || "default"}`;
+      status.textContent = detailText(item.status) || statusText(item.statusKey);
+      header.appendChild(status);
+    }
     target.appendChild(header);
 
     [[texts.bookingEventLabel, detailText(item.publicTitle)], [texts.bookingOrganizerLabel, detailText(item.publicOrganizer)]].forEach(([label, value]) => {
@@ -107,10 +111,8 @@
     return article;
   }
 
-  function renderOccupancy(items, loadedAt, stale) {
+  function renderOccupancy(items) {
     const list = document.getElementById("occupancyList");
-    const meta = document.getElementById("occupancyMeta");
-    meta.textContent = `${stale ? texts.statusStale : texts.statusCurrent}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
 
     if (!items.length) {
       renderEmpty(list, texts.occupancyEmpty);
@@ -176,13 +178,11 @@
 
   function renderOccupancyPlan(items, loadedAt, stale, range) {
     const list = document.getElementById("occupancyList");
-    const meta = document.getElementById("occupancyMeta");
     const itemsByDate = items.reduce((map, item) => {
       if (!map.has(item.date)) map.set(item.date, []);
       map.get(item.date).push(item);
       return map;
     }, new Map());
-    meta.textContent = `${stale ? texts.statusStale : texts.statusCurrent}: ${dateTimeFormatter.format(new Date(loadedAt))}`;
     list.innerHTML = `
       <div class="occupancy-plan" aria-label="${escapeHtml(texts.occupancyPlanLabel)}">
         ${monthsInRange(range).map((month) => renderMonth(month, itemsByDate, range)).join("")}
@@ -193,6 +193,170 @@
         <span><i class="is-partial"></i> ${escapeHtml(texts.statusPartial)}</span>
         <span><i class="is-blocked"></i> ${escapeHtml(texts.statusBlocked)}</span>
       </div>`;
+  }
+
+  function createItemsByDate(items) {
+    return items.reduce((map, item) => {
+      if (!map.has(item.date)) map.set(item.date, []);
+      map.get(item.date).push(item);
+      return map;
+    }, new Map());
+  }
+
+  function appendPrintField(document, target, label, value) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = label;
+    description.textContent = value;
+    row.append(term, description);
+    target.appendChild(row);
+  }
+
+  function renderPrintHeader(document, target, snapshot) {
+    const header = document.createElement("header");
+    header.className = "occupancy-print-header";
+    const title = document.createElement("h1");
+    title.textContent = texts.printTitle;
+    const fields = document.createElement("dl");
+    const range = snapshot.range || {};
+    const rangeText = range.from && range.to
+      ? `${dateFormatter.format(new Date(`${range.from}T00:00:00`))} ${texts.timeUntil} ${dateFormatter.format(new Date(`${range.to}T00:00:00`))}`
+      : "";
+    appendPrintField(document, fields, texts.printBuildingLabel, snapshot.buildingName || snapshot.building || texts.defaultBuilding);
+    appendPrintField(document, fields, texts.printRangeLabel, rangeText);
+    appendPrintField(document, fields, texts.printViewLabel, snapshot.view === "plan" ? texts.viewPlan : texts.viewTable);
+    appendPrintField(document, fields, texts.printDataStatusLabel, snapshot.loadedAt ? dateTimeFormatter.format(new Date(snapshot.loadedAt)) : "");
+    appendPrintField(document, fields, texts.printCreatedAtLabel, snapshot.createdAt ? dateTimeFormatter.format(new Date(snapshot.createdAt)) : "");
+    header.append(title, fields);
+    if (snapshot.stale) {
+      const stale = document.createElement("p");
+      stale.className = "occupancy-print-notice";
+      stale.textContent = texts.statusStale;
+      header.appendChild(stale);
+    }
+    if (snapshot.online === false) {
+      const offline = document.createElement("p");
+      offline.className = "occupancy-print-notice";
+      offline.textContent = texts.printOffline;
+      header.appendChild(offline);
+    }
+    target.appendChild(header);
+  }
+
+  function renderPrintDetails(document, target, items, className) {
+    const section = document.createElement("section");
+    section.className = className || "occupancy-print-details";
+    const title = document.createElement("h2");
+    title.textContent = texts.printDetailsTitle;
+    section.appendChild(title);
+    if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = texts.occupancyEmpty;
+      section.appendChild(empty);
+    } else {
+      const list = document.createElement("div");
+      list.className = "occupancy-print-list";
+      window.FrontendCore.sortOccupancyItems(items).forEach((item) => {
+        const article = document.createElement("article");
+        article.className = `booking-details occupancy-print-entry status-${item.statusKey || "default"}`;
+        renderBookingDetails(article, item);
+        list.appendChild(article);
+      });
+      section.appendChild(list);
+    }
+    target.appendChild(section);
+  }
+
+  function renderPrintMonth(document, month, itemsByDate, range) {
+    const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const offset = (firstDay.getDay() + 6) % 7;
+    const key = monthKey(firstDay);
+    const article = document.createElement("article");
+    article.className = "occupancy-print-month";
+    const heading = document.createElement("h3");
+    heading.textContent = monthFormatter.format(firstDay);
+    const weekdayRow = document.createElement("div");
+    weekdayRow.className = "occupancy-print-weekdays";
+    weekdays.forEach((day) => {
+      const cell = document.createElement("span");
+      cell.textContent = day;
+      weekdayRow.appendChild(cell);
+    });
+    const days = document.createElement("div");
+    days.className = "occupancy-print-days";
+    for (let index = 0; index < offset; index += 1) {
+      const blank = document.createElement("span");
+      blank.className = "occupancy-print-day is-empty";
+      days.appendChild(blank);
+    }
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${key}-${String(day).padStart(2, "0")}`;
+      const cell = document.createElement("span");
+      cell.className = "occupancy-print-day";
+      const number = document.createElement("span");
+      number.className = "occupancy-print-day-number";
+      number.textContent = day;
+      cell.appendChild(number);
+      if (date < range.from || date > range.to) {
+        cell.classList.add("is-out-of-range");
+      } else {
+        const status = window.FrontendCore.dayStatus(itemsByDate.get(date) || []);
+        const marker = document.createElement("span");
+        marker.className = "occupancy-print-day-marker";
+        marker.textContent = ({ free: "F", busy: "B", partial: "T", blocked: "G" })[status];
+        cell.classList.add(`is-${status}`);
+        cell.appendChild(marker);
+      }
+      days.appendChild(cell);
+    }
+    article.append(heading, weekdayRow, days);
+    return article;
+  }
+
+  function renderPrintLegend(document, target) {
+    const legend = document.createElement("section");
+    legend.className = "occupancy-print-legend";
+    const title = document.createElement("h2");
+    title.textContent = texts.legendLabel;
+    const entries = [
+      ["free", "F", texts.statusFree],
+      ["busy", "B", texts.statusBusy],
+      ["partial", "T", texts.statusPartial],
+      ["blocked", "G", texts.statusBlocked]
+    ];
+    legend.appendChild(title);
+    entries.forEach(([status, marker, label]) => {
+      const entry = document.createElement("span");
+      entry.className = `is-${status}`;
+      entry.textContent = `${marker} ${label}`;
+      legend.appendChild(entry);
+    });
+    target.appendChild(legend);
+  }
+
+  function renderOccupancyPrint(target, snapshot) {
+    if (!target) return;
+    target.replaceChildren();
+    if (!snapshot || !snapshot.range) return;
+    const document = target.ownerDocument;
+    const items = window.FrontendCore.sortOccupancyItems(snapshot.items || []);
+    renderPrintHeader(document, target, snapshot);
+    if (snapshot.view !== "plan") {
+      renderPrintDetails(document, target, items);
+      return;
+    }
+    const plan = document.createElement("section");
+    plan.className = "occupancy-print-plan";
+    const itemsByDate = createItemsByDate(items);
+    monthsInRange(snapshot.range).forEach((month) => {
+      plan.appendChild(renderPrintMonth(document, month, itemsByDate, snapshot.range));
+    });
+    target.appendChild(plan);
+    renderPrintLegend(document, target);
+    renderPrintDetails(document, target, items, "occupancy-print-details occupancy-print-details-page");
   }
 
   let dialogTrigger = null;
@@ -301,6 +465,7 @@
     setConnectionStatus,
     renderOccupancy,
     renderOccupancyPlan,
+    renderOccupancyPrint,
     renderBookingDetails,
     openBookingDetailsDialog,
     bindBookingDialog,

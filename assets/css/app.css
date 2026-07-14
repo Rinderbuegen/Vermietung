@@ -160,6 +160,8 @@ main {
   flex: 1;
 }
 
+#occupancyPrint { display: none; }
+
 @media (min-width: 841px) and (min-height: 560px) {
   html,
   body {
@@ -298,6 +300,7 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
 .button-primary:hover { background: var(--color-primary-dark); }
 .button-secondary { background: white; border-color: var(--color-border); color: var(--color-primary); }
 .button-secondary:hover { border-color: var(--color-primary); background: #f9f9f9; }
+.button:disabled { cursor: not-allowed; opacity: 0.65; }
 
 .building-card,
 .panel {
@@ -331,7 +334,7 @@ h3 { margin: 0 0 8px; font-size: 1.18rem; font-weight: 700; }
 }
 
 .filter-bar {
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.5fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.5fr) auto auto;
   align-items: end;
 }
 
@@ -604,4 +607,175 @@ button:disabled .spinner {
   html,
   main { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 14mm;
+}
+
+@media print {
+  html,
+  body,
+  main {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body {
+    display: block;
+    background: #fff;
+    color: #000;
+    font-family: var(--font-base);
+    font-size: 10pt;
+    line-height: 1.35;
+  }
+
+  body > * { display: none !important; }
+  body > #occupancyPrint { display: block !important; }
+
+  #occupancyPrint,
+  #occupancyPrint * {
+    color: #000;
+    text-shadow: none;
+  }
+
+  .occupancy-print-header {
+    margin-bottom: 7mm;
+    padding-bottom: 4mm;
+    border-bottom: 1.5pt solid #000;
+  }
+
+  .occupancy-print-header h1 {
+    margin: 0 0 4mm;
+    color: #000;
+    font-size: 18pt;
+    font-weight: 700;
+  }
+
+  .occupancy-print-header dl {
+    display: grid;
+    grid-template-columns: 30mm 1fr;
+    gap: 1.5mm 4mm;
+    margin: 0;
+  }
+
+  .occupancy-print-header dl div { display: contents; }
+  .occupancy-print-header dt { font-weight: 700; }
+  .occupancy-print-header dd { margin: 0; overflow-wrap: anywhere; }
+
+  .occupancy-print-notice {
+    margin: 3mm 0 0;
+    padding: 2mm 3mm;
+    border: 1pt solid #000;
+    font-weight: 700;
+  }
+
+  .occupancy-print-plan {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6mm;
+  }
+
+  .occupancy-print-month,
+  .occupancy-print-entry,
+  .occupancy-print-details h2,
+  .occupancy-print-legend {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .occupancy-print-month h3,
+  .occupancy-print-details h2,
+  .occupancy-print-legend h2 {
+    margin: 0 0 2.5mm;
+    color: #000;
+    font-size: 12pt;
+  }
+
+  .occupancy-print-month h3 { text-align: center; }
+
+  .occupancy-print-weekdays,
+  .occupancy-print-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.7mm;
+  }
+
+  .occupancy-print-weekdays {
+    margin-bottom: 1mm;
+    font-size: 8pt;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .occupancy-print-day {
+    display: flex;
+    min-height: 8mm;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5mm;
+    padding: 0.8mm;
+    border: 0.6pt solid #000;
+    font-size: 8pt;
+    font-weight: 700;
+  }
+
+  .occupancy-print-day.is-empty,
+  .occupancy-print-day.is-out-of-range {
+    border-color: transparent;
+  }
+
+  .occupancy-print-day.is-out-of-range { color: #777; }
+  .occupancy-print-day-marker { font-size: 7pt; }
+  .occupancy-print-day.is-free { border-style: solid; }
+  .occupancy-print-day.is-busy { border-width: 1.4pt; }
+  .occupancy-print-day.is-partial { border-style: dashed; }
+  .occupancy-print-day.is-blocked { border-width: 1.4pt; border-style: double; }
+
+  .occupancy-print-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2mm 5mm;
+    margin: 5mm 0 0;
+  }
+
+  .occupancy-print-legend h2 { width: 100%; }
+  .occupancy-print-legend span { padding: 1mm 2mm; border: 0.6pt solid #000; font-weight: 700; }
+  .occupancy-print-legend .is-busy { border-width: 1.4pt; }
+  .occupancy-print-legend .is-partial { border-style: dashed; }
+  .occupancy-print-legend .is-blocked { border-width: 1.4pt; border-style: double; }
+
+  .occupancy-print-details { margin-top: 7mm; }
+  .occupancy-print-details-page { break-before: page; page-break-before: always; }
+  .occupancy-print-list { display: grid; gap: 3mm; }
+
+  .occupancy-print-entry {
+    padding: 3mm;
+    border: 0.6pt solid #000;
+    background: #fff;
+    overflow-wrap: anywhere;
+  }
+
+  .occupancy-print-entry .booking-date-label {
+    min-height: auto;
+    padding: 1mm 2mm;
+    border: 0.8pt solid #000;
+    background: #fff;
+    color: #000;
+  }
+
+  .occupancy-print-entry .status-label {
+    min-height: auto;
+    padding: 1mm 2mm;
+    border: 0.8pt solid #000;
+    background: #fff;
+    color: #000;
+  }
+
+  .occupancy-print-entry.status-blocked .status-label { border-width: 1.4pt; border-style: double; }
+  .occupancy-print-entry .booking-detail-text { margin-top: 2mm; }
+  .occupancy-print-entry a { color: #000; overflow-wrap: anywhere; }
+  .occupancy-print-details .empty { padding: 3mm; border-color: #000; }
 }

@@ -44,18 +44,20 @@ def config_for(scope: str, origin: str) -> str:
     return "window.APP_CONFIG = " + json.dumps(payload, ensure_ascii=False) + ";\n"
 
 
-def occupancy(building_id: str) -> list[dict]:
+def occupancy(building_id: str, requested_to: str) -> list[dict]:
     prefix = "DGH" if building_id == "dgh_rb" else "Gemeindehaus"
     return [
-        {"date": "2026-07-18", "from": "18:00", "to": "21:00", "allDay": False, "status": "belegt", "statusKey": "confirmed", "publicTitle": f"{prefix} Abend", "publicOrganizer": ""},
+        {"date": "2026-07-18", "from": "18:00", "to": "21:00", "allDay": False, "status": "belegt", "statusKey": "confirmed", "publicTitle": f"{prefix} Abend {requested_to}", "publicOrganizer": ""},
         {"date": "2026-07-18", "from": "09:00", "to": "12:00", "allDay": False, "status": "belegt", "statusKey": "confirmed", "publicTitle": "**Frühstück**\n[Details](https://example.org/info) <img src=x onerror=alert(1)>", "publicOrganizer": "[Mail](mailto:verein@example.org)"},
         {"date": "2026-07-20", "from": "00:00", "to": "23:59", "allDay": True, "status": "gesperrt", "statusKey": "blocked", "publicTitle": "", "publicOrganizer": ""},
         {"date": "2026-07-21", "from": "15:00", "to": "18:00", "allDay": False, "status": "gesperrt", "statusKey": "blocked", "publicTitle": "Teilweise gesperrt", "publicOrganizer": ""},
         {"date": "2026-07-22", "from": "10:00", "to": "12:00", "allDay": False, "status": "belegt", "statusKey": "confirmed", "publicTitle": "", "publicOrganizer": ""},
+        {"date": "2026-07-23", "from": "10:00", "to": "12:00", "allDay": False, "statusKey": "unknown", "publicTitle": "Ä Ö Ü ä ö ü ß", "publicOrganizer": "", "privateNote": "DARF-NIE-GEDRUCKT-WERDEN"},
+        {"date": "2026-07-24", "from": "10:00", "to": "12:00", "allDay": False, "publicTitle": "Leerer Status", "publicOrganizer": ""},
     ]
 
 
-def install_routes(context, origin: str, online: dict[str, bool]):
+def install_routes(context, origin: str, online: dict[str, bool], request_count: dict[str, int]):
     def route_all(route):
         request = route.request
         parsed = urlparse(request.url)
@@ -70,14 +72,16 @@ def install_routes(context, origin: str, online: dict[str, bool]):
             route.fulfill(status=200, content_type="application/javascript", body=config_for(scope, origin))
             return
         if parsed.path == "/exec":
+            query = parse_qs(parsed.query)
+            action = query.get("action", [""])[0]
+            if action == "occupancy":
+                request_count["occupancy"] += 1
             if not online["value"]:
                 route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": False, "message": "offline"}))
                 return
-            query = parse_qs(parsed.query)
             building_id = query.get("buildingId", [""])[0]
-            action = query.get("action", [""])[0]
             if action == "occupancy":
-                data = {"schemaVersion": 2, "loadedAt": "2026-07-14T10:15:00.000Z", "items": occupancy(building_id)}
+                data = {"schemaVersion": 2, "loadedAt": "2026-07-14T10:15:00.000Z", "items": occupancy(building_id, query.get("to", [""])[0])}
             elif action == "building":
                 data = {"name": building_id, "operatorName": "Test", "contactEmail": "test@example.org", "publicNote": "Test"}
             else:
@@ -89,11 +93,22 @@ def install_routes(context, origin: str, online: dict[str, bool]):
     context.route("**/*", route_all)
 
 
+def wait_for_occupancy_requests(page, count: int) -> None:
+    page.wait_for_function("expected => window.__occupancyFetches.length === expected", arg=count)
+
+
+def assert_no_store(page, request_count: int) -> None:
+    fetches = page.evaluate("window.__occupancyFetches")
+    assert len(fetches) == request_count, (fetches, request_count)
+    assert all(entry["cache"] == "no-store" for entry in fetches)
+
+
 def main() -> None:
     if not SITE.is_dir():
         raise SystemExit("_site fehlt. Zuerst python scripts/build-pages-site.py ausführen.")
     errors: list[str] = []
     online = {"value": True}
+    request_count = {"occupancy": 0}
     with local_server() as origin, sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
@@ -105,9 +120,37 @@ def main() -> None:
               static now() {{ return {FIXED_NOW}; }}
             }}
             window.Date = FixedDate;
+            window.__online = true;
+            Object.defineProperty(Navigator.prototype, "onLine", {{ configurable: true, get: () => window.__online }});
+            window.__occupancyFetches = [];
+            window.__occupancyGates = new Map();
+            window.__createOccupancyGate = (from) => {{
+              let release;
+              const promise = new Promise((resolve) => {{ release = resolve; }});
+              window.__occupancyGates.set(from, {{ promise, release }});
+            }};
+            window.__releaseOccupancyGate = (from) => {{
+              const gate = window.__occupancyGates.get(from);
+              if (gate) {{ gate.release(); window.__occupancyGates.delete(from); }}
+            }};
+            const nativeFetch = window.fetch.bind(window);
+            window.fetch = async (input, options) => {{
+              const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url, window.location.href);
+              if (url.searchParams.get("action") !== "occupancy") return nativeFetch(input, options);
+              window.__occupancyFetches.push({{ url: url.href, cache: options && options.cache }});
+              const response = await nativeFetch(input, options);
+              const gate = window.__occupancyGates.get(`${{url.searchParams.get("from")}}:${{url.searchParams.get("to")}}`);
+              if (gate) await gate.promise;
+              return response;
+            }};
+            window.__printCalls = [];
+            window.print = () => window.__printCalls.push({{
+              text: document.getElementById("occupancyPrint").innerText,
+              childCount: document.getElementById("occupancyPrint").childElementCount
+            }});
           }})();
         """)
-        install_routes(context, origin, online)
+        install_routes(context, origin, online, request_count)
         page = context.new_page()
         page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
         page.on("pageerror", lambda error: errors.append(str(error)))
@@ -116,6 +159,9 @@ def main() -> None:
         assert page.locator("#occupancyList").get_attribute("aria-live") is None
         assert page.locator("#occupancyMeta").get_attribute("role") == "status"
         assert page.locator("#occupancyMeta").get_attribute("aria-atomic") == "true"
+        assert page.get_by_role("button", name="PDF erstellen / drucken").count() == 1
+        assert request_count["occupancy"] == 1
+        assert_no_store(page, request_count["occupancy"])
         assert page.locator(".occupancy-month h3").count() >= 1
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         assert page.locator("[data-occupancy-date='2026-07-20']").evaluate("node => node.classList.contains('is-blocked')")
@@ -135,6 +181,7 @@ def main() -> None:
         mailto_link = dialog.locator("a[href='mailto:verein@example.org']")
         assert mailto_link.get_attribute("target") is None
         assert dialog.locator("script, img, svg, [onerror]").count() == 0
+        assert dialog.locator(".status-label").count() == 0
         page.keyboard.press("Escape")
         assert page.locator("#bookingDetailsDialog").evaluate("node => !node.open")
         page.wait_for_timeout(10)
@@ -151,45 +198,169 @@ def main() -> None:
         assert dialog.evaluate("node => node.open")
         page.keyboard.press("Escape")
 
-        trigger = page.locator("[data-occupancy-date='2026-07-18']")
-        trigger.click()
-        page.evaluate("""() => {
-          const view = document.getElementById('occupancyView');
-          view.value = 'table';
-          view.dispatchEvent(new Event('change', { bubbles: true }));
-        }""")
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(10)
-        assert page.evaluate("document.activeElement.id") == "occupancyView"
-
-        page.locator("#occupancyView").select_option("plan")
-        page.locator("[data-booking-date='2026-07-16']").click()
-        assert page.locator("#bookingForm [name='date']").input_value() == "2026-07-16"
-
+        before_view_change = request_count["occupancy"]
         page.locator("#occupancyView").select_option("table")
-        assert page.locator(".booking-details").count() == 5
-        empty_entry = page.locator(".booking-details").filter(has_text="10:00 bis 12:00 Uhr")
+        page.locator("#occupancyView").select_option("plan")
+        assert request_count["occupancy"] == before_view_change
+        page.locator("#occupancyView").select_option("table")
+        assert page.locator(".booking-details").count() == 7
+        empty_entry = page.locator(".booking-details.status-confirmed").filter(has_text="22.07.2026")
         assert empty_entry.locator(".booking-detail-text").count() == 0
         assert page.locator(".booking-details").filter(has_text="Frühstück").locator(".booking-detail-text").count() == 2
+        assert page.locator(".booking-details").filter(has_text="Frühstück").locator(".status-label").count() == 0
+        assert page.locator(".booking-details.status-blocked").first.locator(".status-label").inner_text() == "gesperrt"
+        assert page.locator(".booking-details.status-unknown").locator(".status-label").inner_text() == "Status unbekannt"
+        assert page.locator(".booking-details.status-default").locator(".status-label").inner_text() == "Status unbekannt"
+
+        page.locator("#occupancyView").select_option("plan")
+        page.locator("[data-occupancy-date='2026-07-20']").click()
+        assert dialog.locator(".status-label").inner_text() == "gesperrt"
+        page.keyboard.press("Escape")
+        page.locator("[data-occupancy-date='2026-07-23']").click()
+        assert dialog.locator(".status-label").inner_text() == "Status unbekannt"
+        page.keyboard.press("Escape")
+        page.locator("#occupancyView").select_option("table")
+
+        page.evaluate("window.__createOccupancyGate('2026-07-14:2026-07-31')")
+        refresh = page.locator("#occupancyRefreshButton")
+        refresh.click()
+        wait_for_occupancy_requests(page, before_view_change + 1)
+        assert page.locator("#occupancyList").get_attribute("inert") == ""
+        assert page.locator("#occupancyList").get_attribute("aria-busy") == "true"
+        assert refresh.is_disabled()
+        assert page.locator("#occupancyPrintButton").is_disabled()
+        page.locator("#occupancyView").select_option("plan")
+        assert page.locator("#occupancyMeta").inner_text() == "Belegung wird aktualisiert …"
+        page.evaluate("document.getElementById('occupancyFilter').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))")
+        page.wait_for_timeout(20)
+        assert request_count["occupancy"] == before_view_change + 1
+        page.evaluate("window.__releaseOccupancyGate('2026-07-14:2026-07-31')")
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        page.locator("#occupancyView").select_option("table")
+
+        before_range_change = request_count["occupancy"]
+        page.locator("#occupancyRange").select_option("next-month")
+        wait_for_occupancy_requests(page, before_range_change + 1)
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        assert request_count["occupancy"] == before_range_change + 1
+        assert_no_store(page, request_count["occupancy"])
+
+        before_race = request_count["occupancy"]
+        page.evaluate("window.__createOccupancyGate('2026-07-14:2026-07-31')")
+        page.locator("#occupancyRange").select_option("current-month")
+        wait_for_occupancy_requests(page, before_race + 1)
+        page.locator("#occupancyRange").select_option("next-month")
+        wait_for_occupancy_requests(page, before_race + 2)
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        assert "DGH Abend 2026-08-31" in page.locator("#occupancyList").inner_text()
+        page.evaluate("window.__releaseOccupancyGate('2026-07-14:2026-07-31')")
+        page.wait_for_timeout(20)
+        assert "DGH Abend 2026-08-31" in page.locator("#occupancyList").inner_text()
+        assert page.locator("#occupancyList").get_attribute("aria-busy") == "false"
+        assert_no_store(page, request_count["occupancy"])
+
+        before_print = request_count["occupancy"]
+        page.get_by_role("button", name="PDF erstellen / drucken").click()
+        assert page.evaluate("window.__printCalls.length") == 1
+        assert "Belegung drucken" in page.locator("#occupancyPrint").inner_text()
+        assert "DGH Abend 2026-08-31" in page.locator("#occupancyPrint").inner_text()
+        assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 0
+        assert page.locator("#occupancyPrint .booking-details.status-blocked .status-label").first.inner_text() == "gesperrt"
+        assert page.locator("#occupancyPrint .booking-details.status-unknown .status-label").inner_text() == "Status unbekannt"
+        assert page.locator("#occupancyPrint .booking-details.status-default .status-label").inner_text() == "Status unbekannt"
+        assert page.locator("#occupancyPrint .booking-details.status-confirmed .status-label").count() == 0
+        assert "DARF-NIE-GEDRUCKT-WERDEN" not in page.locator("#occupancyPrint").inner_text()
+        assert request_count["occupancy"] == before_print
+
+        page.locator("#occupancyView").select_option("plan")
+        page.get_by_role("button", name="PDF erstellen / drucken").click()
+        assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1
+        assert page.locator("#occupancyPrint .occupancy-print-details-page").count() == 1
+        assert page.evaluate("window.__printCalls.length") == 2
+        page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
+        assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1
+        assert request_count["occupancy"] == before_print
+        page.emulate_media(media="print")
+        assert page.locator("#occupancyPrint").evaluate("node => getComputedStyle(node).display") == "block"
+        assert page.locator("main").evaluate("node => getComputedStyle(node).display") == "none"
+        page.emulate_media(media="screen")
 
         online["value"] = False
-        page.get_by_role("button", name="Aktualisieren").click()
-        page.wait_for_timeout(100)
-        assert "Möglicherweise veralteter Stand" in page.locator("#occupancyMeta").inner_text()
+        page.evaluate("window.__online = false")
+        page.locator("#occupancyView").select_option("table")
+        page.locator("#occupancyRefreshButton").click()
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        stale_meta = page.locator("#occupancyMeta").inner_text()
+        assert "Möglicherweise veralteter Stand" in stale_meta
+        assert "Die Belegung konnte nicht geladen werden" in stale_meta
         assert "Frühstück" in page.locator("#occupancyList").inner_text()
         page.locator("#occupancyView").select_option("plan")
-        assert "Möglicherweise veralteter Stand" in page.locator("#occupancyMeta").inner_text()
-        page.evaluate("localStorage.setItem('occupancy:v2:dgh_rb:2026-07-14:2026-07-31', JSON.stringify({cachedAt: 0, payload: {items: [{date: '2026-07-18', publicTitle: 'Alt'}]}}))")
-        page.locator("#occupancyView").select_option("table")
-        page.get_by_role("button", name="Aktualisieren").click()
-        page.wait_for_timeout(100)
-        assert "Alt" not in page.locator("#occupancyList").inner_text()
+        assert page.locator("#occupancyMeta").inner_text() == stale_meta
+        page.get_by_role("button", name="PDF erstellen / drucken").click()
+        print_text = page.locator("#occupancyPrint").inner_text()
+        assert "Möglicherweise veralteter Stand" in print_text
+        assert "Offline erstellt" in print_text
+
+        before_error_range = request_count["occupancy"]
+        page.evaluate("""() => {
+          window.__createOccupancyGate('2026-08-01:2026-08-31');
+          const select = document.getElementById('occupancyRange');
+          select.dataset.from = '2026-08-01';
+          select.dataset.to = '2026-08-31';
+          select.value = 'selected-month';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }""")
+        wait_for_occupancy_requests(page, before_error_range + 1)
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'true'")
+        assert page.locator("#occupancyPrint").inner_text() == ""
+        page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
+        assert page.locator("#occupancyPrint").inner_text() == ""
+        online["value"] = False
+        page.evaluate("window.__online = false; window.__releaseOccupancyGate('2026-08-01:2026-08-31')")
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        assert "Die Belegung konnte nicht geladen werden" in page.locator("#occupancyMeta").inner_text()
+        assert page.locator("#occupancyPrint").inner_text() == ""
+        assert page.locator("#occupancyPrintButton").is_disabled()
+        assert_no_store(page, request_count["occupancy"])
 
         online["value"] = True
+        page.evaluate("window.__online = true")
         page.goto(f"{origin}/DGH/", wait_until="networkidle")
+        page.evaluate("""() => {
+          const put = (key, value) => localStorage.setItem(key, value);
+          put('occupancy:v2:dgh_rb:bad', '{');
+          put('occupancy:v2:dgh_rb:expired', JSON.stringify({ cachedAt: 0, payload: { items: [] } }));
+          put('occupancy:v2:dgh_rb:fresh', JSON.stringify({ cachedAt: 1784024100000, payload: { items: [] } }));
+          put('occupancy:v2:ev_gem_rb:bad', '{');
+          put('foreign:cache', 'unchanged');
+          put('occupancy:dgh_rb:2027-01-01:2027-12-31', 'legacy');
+        }""")
+        page.locator("#occupancyRange").select_option("next-year")
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        keys = page.evaluate("Object.keys(localStorage).sort()")
+        assert "occupancy:v2:dgh_rb:bad" not in keys
+        assert "occupancy:v2:dgh_rb:expired" not in keys
+        assert "occupancy:v2:dgh_rb:fresh" in keys
+        assert page.evaluate("localStorage.getItem('occupancy:v2:ev_gem_rb:bad')") == "{"
+        assert page.evaluate("localStorage.getItem('foreign:cache')") == "unchanged"
+        assert "occupancy:dgh_rb:2027-01-01:2027-12-31" not in keys
+        assert all(entry["cache"] == "no-store" for entry in page.evaluate("window.__occupancyFetches"))
+
         page.goto(f"{origin}/Gemeindehaus/", wait_until="networkidle")
         page.locator("#occupancyView").select_option("table")
         assert "Gemeindehaus Abend" in page.locator("#occupancyList").inner_text()
+        before_gemeindehaus_print = request_count["occupancy"]
+        page.get_by_role("button", name="PDF erstellen / drucken").click()
+        gemeindehaus_print = page.locator("#occupancyPrint")
+        assert "Gemeindehaus Abend 2026-07-31" in gemeindehaus_print.inner_text()
+        https_link = gemeindehaus_print.locator("a[href='https://example.org/info']")
+        assert https_link.get_attribute("target") == "_blank"
+        assert https_link.get_attribute("rel") == "noopener noreferrer"
+        mailto_link = gemeindehaus_print.locator("a[href='mailto:verein@example.org']")
+        assert mailto_link.get_attribute("target") is None
+        assert mailto_link.get_attribute("rel") is None
+        assert request_count["occupancy"] == before_gemeindehaus_print
+        assert all(entry["cache"] == "no-store" for entry in page.evaluate("window.__occupancyFetches"))
         keys = page.evaluate("Object.keys(localStorage).sort()")
         assert any(key.startswith("occupancy:v2:dgh_rb:") for key in keys)
         assert any(key.startswith("occupancy:v2:ev_gem_rb:") for key in keys)

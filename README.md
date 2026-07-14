@@ -1,6 +1,6 @@
 # Gebäudevermietung PWA
 
-Version 1.3.1. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
+Version 1.4.0. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
 
 ## Öffentliche URLs und IDs
 
@@ -52,6 +52,12 @@ Anpassbare Backendwerte, Gebäude-Startdatensätze und Texte stehen unter `betre
 Öffentlich erscheinen Datum, Zeit und Status sowie nur ausdrücklich und fail closed freigegebene Veranstaltungstitel oder Veranstalter. Eingeschränktes Markdown wird sicher gerendert. Freigegebene Details können für Offlinebetrieb bis zu 24 Stunden ab Abruf auf demselben Gerät zwischengespeichert bleiben; private Anfragefelder bleiben im Backend.
 
 Die vollständige Datenschutzerklärung ist harte Voraussetzung, bevor Personennamen oder `mailto:`-Links als öffentliche Veranstalterdetails freigegeben werden. Solange der Rechtstext noch einen Platzhalter enthält, `public_show_booking_details` nicht aktivieren.
+
+## Belegung
+
+Ein Zeitraumwechsel aktualisiert die Belegung automatisch; der Wechsel zwischen Plan und Liste rendert nur bereits geladene Daten. „PDF erstellen / drucken“ erstellt aus einem eingefrorenen Snapshot öffentlicher Belegungsdaten eine A4-Druckansicht im Browser-Druckdialog. Offline oder möglicherweise veraltete Daten sind im Ausdruck markiert.
+
+Bestätigte Einträge zeigen keinen redundanten Badge „belegt“. Gesperrte und unbekannte Status behalten ihn; Kalender, Legende und ARIA-Texte verwenden „belegt“ weiterhin.
 
 GitHub Actions prüft Pull Requests ohne Secrets. Nach grüner Qualitätsprüfung auf `main` läuft die Pages-Bereitstellung bis zur Freigabe im geschützten Environment `github-pages`; diese darf erst nach Backend-, Migrations- und Datenschutzchecks erfolgen. `workflow_dispatch` dient zum Wiederholen. Die Web-App-URL wird ausschließlich beim Deployment aus `APPS_SCRIPT_WEB_APP_URL` in `_site` eingesetzt und ist im Browser technisch öffentlich. Echte Secrets dürfen nie in Frontend-Betreiberdateien stehen.
 

@@ -2,7 +2,7 @@
 
 ## Stand
 
-Version 1.3.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
+Version 1.4.0. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
 
 ## Architektur
 
@@ -17,6 +17,8 @@ Version 1.3.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktan
 - Texte: sichtbare UI-Texte kommen aus `betreiber/allgemein/texte/frontend.json`, Rechtstexte aus `rechtliches.md`; Gebäude können `frontend.json` überschreiben.
 - Backend: Google Apps Script und private Google Sheets. `scripts/build-apps-script.py` injiziert Betreiberkonfiguration/-texte in direkt deploybares `apps-script/buchungs-api/Code.gs`.
 - Runtime: `scripts/configure-runtime.py` ersetzt nur die öffentliche Apps-Script-Web-App-URL im Buildartefakt. Quellen für Laufzeitwerte liegen unter `betreiber/**/konfiguration/frontend.json`; `config/config.js` ist ein scope-eigenes Buildprodukt.
+- Belegung: Zeitraumwechsel ruft die öffentliche Belegung automatisch ab, Plan-/Listenwechsel rendert lokal. Der Browserdruck nutzt einen eingefrorenen Snapshot der geladenen öffentlichen Daten, markiert Offline- oder stale-Daten und druckt A4-Hochformat.
+- Statusanzeige: Bestätigte Detaileinträge zeigen keinen redundanten Badge „belegt“; gesperrte und unbekannte Status bleiben gekennzeichnet. Kalender, Legende und ARIA-Texte behalten „belegt“.
 - Öffentliche Details: API-Schema 2 gibt optional `publicTitle` und `publicOrganizer` aus, ausschließlich mit fail-closed Master, Feldcheckbox und nicht leerem Text. Eingeschränktes Markdown wird im Browser über eine DOM-Whitelist gerendert.
 - Offlinecache: Vollständige öffentliche Details können pro Gebäude und Zeitraum höchstens 24 Stunden ab `cachedAt` in `localStorage` bleiben; private Anfragefelder werden nicht gecacht.
 
@@ -29,4 +31,4 @@ Version 1.3.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktan
 
 ## Datenschutz
 
-Öffentlich erscheinen Datum, Uhrzeit, Status und optional ausdrücklich freigegebener Titel oder Veranstalter. Namen, Kontaktdaten, interne Notizen und Anfragehistorie bleiben im Backend, sofern ein Betreiber sie nicht bewusst als öffentlichen Veranstalter freigibt. Freigegebene Details können offline bis zu 24 Stunden sichtbar bleiben. Vor Freigabe von Personennamen oder `mailto:`-Links muss die Datenschutzerklärung fertig und geprüft sein. Keine vertraulichen Werte oder Sicherheitsfreigaben unter `betreiber/**/konfiguration/frontend.json` ablegen.
+Öffentlich erscheinen Datum, Uhrzeit, Status und optional ausdrücklich freigegebener Titel oder Veranstalter. Der Browserdruck enthält ausschließlich diesen bereits geladenen öffentlichen Belegungssnapshot. Namen, Kontaktdaten, interne Notizen und Anfragehistorie bleiben im Backend, sofern ein Betreiber sie nicht bewusst als öffentlichen Veranstalter freigibt. Freigegebene Details können offline bis zu 24 Stunden sichtbar bleiben. Vor Freigabe von Personennamen oder `mailto:`-Links muss die Datenschutzerklärung fertig und geprüft sein. Keine vertraulichen Werte oder Sicherheitsfreigaben unter `betreiber/**/konfiguration/frontend.json` ablegen.

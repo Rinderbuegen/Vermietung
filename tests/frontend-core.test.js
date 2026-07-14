@@ -13,7 +13,14 @@ const record = Core.createOccupancyCacheRecord(payload, now);
 assert.deepEqual(Core.parseOccupancyCacheRecord(JSON.stringify(record), now + Core.OCCUPANCY_CACHE_TTL_MS - 1), { state: "fresh", payload });
 assert.deepEqual(Core.parseOccupancyCacheRecord(JSON.stringify(record), now + Core.OCCUPANCY_CACHE_TTL_MS), { state: "expired" });
 assert.deepEqual(Core.parseOccupancyCacheRecord(JSON.stringify(record), now - 1), { state: "invalid" });
-["{", "null", "[]", JSON.stringify({ cachedAt: now, payload: {} })].forEach((value) => assert.equal(Core.parseOccupancyCacheRecord(value, now).state, "invalid"));
+[
+  "{",
+  "null",
+  "[]",
+  JSON.stringify({ cachedAt: now, payload: {} }),
+  JSON.stringify({ cachedAt: now, payload: { items: {} } }),
+  JSON.stringify({ cachedAt: now + 1, payload })
+].forEach((value) => assert.equal(Core.parseOccupancyCacheRecord(value, now).state, "invalid"));
 
 const sorted = Core.sortOccupancyItems([
   { date: "2026-07-20", from: "18:00", to: "20:00", id: "late" },
@@ -22,6 +29,7 @@ const sorted = Core.sortOccupancyItems([
   { date: "2026-07-19", from: "20:00", to: "21:00", id: "previous" }
 ]);
 assert.deepEqual(sorted.map((item) => item.id), ["previous", "first", "same", "late"]);
+assert.deepEqual(Core.sortOccupancyItems([{ date: "2026-07-18", id: "first" }, { date: "2026-07-18", id: "second" }]).map((item) => item.id), ["first", "second"]);
 assert.equal(Core.dayStatus([{ statusKey: "confirmed", allDay: true }, { statusKey: "blocked", allDay: true }]), "blocked");
 assert.equal(Core.dayStatus([{ statusKey: "confirmed", allDay: true }]), "busy");
 assert.equal(Core.dayStatus([{ statusKey: "blocked", allDay: false }]), "partial");

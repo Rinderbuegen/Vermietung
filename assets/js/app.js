@@ -8,6 +8,10 @@
   let currentOccupancyStale = false;
   let occupancyRequestGeneration = 0;
   let occupancyAbortController = null;
+  let occupancyLoadingGeneration = null;
+  let preparedOccupancyPrintSnapshot = null;
+
+  const occupancyDateTimeFormatter = new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" });
 
   function cacheKey(range) {
     return window.FrontendCore.occupancyCacheKey(config.buildingId, range.from, range.to);
@@ -19,6 +23,31 @@
 
   function occupancyStorage() {
     try { return window.localStorage; } catch (error) { return null; }
+  }
+
+  function cleanupOccupancyCache() {
+    const storage = occupancyStorage();
+    const prefix = `occupancy:v2:${config.buildingId}:`;
+    if (!storage || !config.buildingId) return;
+
+    const keys = [];
+    try {
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key && key.startsWith(prefix)) keys.push(key);
+      }
+    } catch (error) {
+      return;
+    }
+
+    keys.forEach((key) => {
+      const result = window.FrontendCore.readStorage(storage, key);
+      if (!result.ok) return;
+      const parsed = window.FrontendCore.parseOccupancyCacheRecord(result.value);
+      if (parsed.state === "expired" || parsed.state === "invalid") {
+        window.FrontendCore.removeStorage(storage, key);
+      }
+    });
   }
 
   function removeOccupancyCache(range) {
@@ -56,7 +85,7 @@
     url.searchParams.set("buildingId", config.buildingId);
     url.searchParams.set("from", range.from);
     url.searchParams.set("to", range.to);
-    const response = await fetch(url, { method: "GET", signal });
+    const response = await fetch(url, { method: "GET", cache: "no-store", signal });
     const payload = await response.json();
     if (!response.ok || !payload.ok) throw new Error(payload.message || "Die Daten konnten nicht geladen werden.");
     return payload.data;
@@ -110,6 +139,144 @@
 
   function bookingItems(items) {
     return (items || []).filter((item) => item.statusKey !== "requested");
+  }
+
+  function occupancyItemsForRange(items, range) {
+    return window.FrontendCore.sortOccupancyItems(bookingItems(items).filter((item) => item && item.date >= range.from && item.date <= range.to));
+  }
+
+  function normalizedOccupancyPayload(payload, range) {
+    return {
+      ...payload,
+      items: occupancyItemsForRange(payload.items, range),
+      loadedAt: payload.loadedAt || new Date().toISOString()
+    };
+  }
+
+  function occupancyMeta(message) {
+    const meta = document.getElementById("occupancyMeta");
+    if (meta) meta.textContent = message;
+  }
+
+  function loadedAtText(loadedAt) {
+    const date = new Date(loadedAt);
+    return Number.isNaN(date.getTime()) ? String(loadedAt || "") : occupancyDateTimeFormatter.format(date);
+  }
+
+  function updateOccupancyMeta(payload, stale, error) {
+    const currentLabel = texts.statusCurrent || "Stand";
+    const staleLabel = texts.statusStale || "Möglicherweise veralteter Stand";
+    const timestamp = loadedAtText(payload.loadedAt);
+    occupancyMeta(`${stale ? staleLabel : currentLabel}: ${timestamp}${error ? ` · ${texts.occupancyLoadFailed || "Die Belegung konnte nicht geladen werden."} ${error.message}` : ""}`);
+  }
+
+  function printButton() {
+    return document.getElementById("occupancyPrintButton");
+  }
+
+  function occupancyIsLoading() {
+    return occupancyLoadingGeneration === occupancyRequestGeneration;
+  }
+
+  function setOccupancyLoading(isLoading, generation) {
+    if (!isLoading && generation !== occupancyRequestGeneration) return;
+
+    const list = document.getElementById("occupancyList");
+    const refresh = document.querySelector('#occupancyFilter button[type="submit"]');
+    const print = printButton();
+    if (isLoading) {
+      occupancyLoadingGeneration = generation;
+      if (list) {
+        list.setAttribute("inert", "");
+        list.setAttribute("aria-busy", "true");
+      }
+      setButtonLoading(refresh, true, texts.updating || "Aktualisieren …");
+      if (print) print.disabled = true;
+      occupancyMeta(texts.occupancyUpdating || "Belegung wird aktualisiert …");
+      return;
+    }
+
+    occupancyLoadingGeneration = null;
+    if (list) {
+      list.removeAttribute("inert");
+      list.setAttribute("aria-busy", "false");
+    }
+    setButtonLoading(refresh, false);
+    if (print) print.disabled = !currentOccupancyPayload || !currentOccupancyRange;
+  }
+
+  function printContainer() {
+    return document.getElementById("occupancyPrint");
+  }
+
+  function invalidateOccupancyPrint() {
+    preparedOccupancyPrintSnapshot = null;
+    const target = printContainer();
+    if (!target) return;
+    target.replaceChildren();
+    target.hidden = true;
+  }
+
+  function freezeOccupancyPrintItem(item) {
+    return Object.freeze({
+      date: String(item.date || ""),
+      from: String(item.from || ""),
+      to: String(item.to || ""),
+      allDay: item.allDay === true,
+      status: typeof item.status === "string" ? item.status : "",
+      statusKey: typeof item.statusKey === "string" ? item.statusKey : "",
+      publicTitle: typeof item.publicTitle === "string" ? item.publicTitle : "",
+      publicOrganizer: typeof item.publicOrganizer === "string" ? item.publicOrganizer : ""
+    });
+  }
+
+  function createOccupancyPrintSnapshot() {
+    if (occupancyIsLoading() || !currentOccupancyPayload || !currentOccupancyRange) return null;
+    const range = Object.freeze({ from: currentOccupancyRange.from, to: currentOccupancyRange.to });
+    const items = Object.freeze(window.FrontendCore.sortOccupancyItems((currentOccupancyPayload.items || [])
+      .filter((item) => item && item.date >= range.from && item.date <= range.to)
+      .map(freezeOccupancyPrintItem)));
+    return Object.freeze({
+      building: config.buildingName || config.appTitle || texts.defaultBuilding || "Gebäude",
+      range,
+      view: selectedView(),
+      loadedAt: currentOccupancyPayload.loadedAt || new Date().toISOString(),
+      stale: currentOccupancyStale,
+      online: navigator.onLine,
+      createdAt: new Date().toISOString(),
+      items
+    });
+  }
+
+  function renderOccupancyPrint(snapshot) {
+    const target = printContainer();
+    if (!target || !window.Ui.renderOccupancyPrint) return;
+    window.Ui.renderOccupancyPrint(target, snapshot);
+    target.hidden = false;
+  }
+
+  function prepareOccupancyPrint() {
+    const snapshot = createOccupancyPrintSnapshot();
+    if (!snapshot) {
+      invalidateOccupancyPrint();
+      return false;
+    }
+    preparedOccupancyPrintSnapshot = snapshot;
+    renderOccupancyPrint(snapshot);
+    return true;
+  }
+
+  function ensureOccupancyPrintUi() {
+    const button = printButton();
+    if (button && !button.dataset.printBound) {
+      button.dataset.printBound = "true";
+      button.disabled = true;
+      button.addEventListener("click", () => {
+        if (prepareOccupancyPrint()) window.print();
+      });
+    }
+    const target = printContainer();
+    if (target) target.hidden = true;
   }
 
   function formData(form) {
@@ -195,36 +362,53 @@
 
   async function loadOccupancy() {
     const select = document.getElementById("occupancyRange");
-    const meta = document.getElementById("occupancyMeta");
+    if (!select) return;
     const range = rangeFromSelection(select.value);
     const storage = occupancyStorage();
+    cleanupOccupancyCache();
     if (storage) window.FrontendCore.removeStorage(storage, legacyCacheKey(range));
+    invalidateOccupancyPrint();
     const generation = ++occupancyRequestGeneration;
     if (occupancyAbortController) occupancyAbortController.abort();
     occupancyAbortController = new AbortController();
     const signal = occupancyAbortController.signal;
+    setOccupancyLoading(true, generation);
     try {
       const data = await fetchOccupancy(range, signal);
       if (generation !== occupancyRequestGeneration || signal.aborted) return;
-      const payload = { ...data, items: window.FrontendCore.sortOccupancyItems(bookingItems(data.items)), loadedAt: data.loadedAt || new Date().toISOString() };
+      const payload = normalizedOccupancyPayload(data, range);
       currentOccupancyPayload = payload;
       currentOccupancyRange = range;
       currentOccupancyStale = false;
       writeOccupancyCache(range, payload);
       renderOccupancy(payload, range, currentOccupancyStale);
+      updateOccupancyMeta(payload, false);
     } catch (error) {
-      if (generation !== occupancyRequestGeneration || error.name === "AbortError") return;
+      if (generation !== occupancyRequestGeneration || signal.aborted || error.name === "AbortError") return;
       const cached = readOccupancyCache(range);
       if (cached) {
-        const payload = { ...cached, items: window.FrontendCore.sortOccupancyItems(bookingItems(cached.items)) };
+        const payload = normalizedOccupancyPayload(cached, range);
         currentOccupancyPayload = payload;
         currentOccupancyRange = range;
         currentOccupancyStale = true;
         renderOccupancy(payload, range, currentOccupancyStale);
-        meta.textContent += ` · ${texts.occupancyLoadFailed} ${error.message}`;
+        updateOccupancyMeta(payload, true, error);
       } else {
-        meta.textContent = `${texts.occupancyLoadFailed} ${error.message}`;
+        currentOccupancyPayload = null;
+        currentOccupancyRange = null;
+        currentOccupancyStale = false;
+        invalidateOccupancyPrint();
+        const dialog = document.getElementById("bookingDetailsDialog");
+        if (dialog && dialog.open) dialog.close();
+        const dialogContent = document.getElementById("bookingDetailsDialogContent");
+        if (dialogContent) dialogContent.replaceChildren();
+        occupancyMeta(`${texts.occupancyLoadFailed || "Die Belegung konnte nicht geladen werden."} ${error.message}`);
         window.Ui.renderEmpty(document.getElementById("occupancyList"), texts.occupancyLoadFailed);
+      }
+    } finally {
+      if (generation === occupancyRequestGeneration) {
+        occupancyAbortController = null;
+        setOccupancyLoading(false, generation);
       }
     }
   }
@@ -280,15 +464,12 @@
   function bindForms() {
     document.getElementById("occupancyFilter").addEventListener("submit", async (event) => {
       event.preventDefault();
-      const button = event.currentTarget.querySelector('button[type="submit"]');
-      const meta = document.getElementById("occupancyMeta");
-      setButtonLoading(button, true, texts.updating);
-      if (meta) meta.textContent = texts.occupancyUpdating;
-      try {
-        await loadOccupancy();
-      } finally {
-        setButtonLoading(button, false);
-      }
+      if (occupancyIsLoading()) return;
+      await loadOccupancy();
+    });
+
+    document.getElementById("occupancyRange").addEventListener("change", () => {
+      loadOccupancy();
     });
 
     document.getElementById("occupancyView").addEventListener("change", () => {
@@ -411,6 +592,7 @@
     window.Ui.applyConfig(config);
     window.Ui.setConnectionStatus();
     window.Ui.bindBookingDialog();
+    ensureOccupancyPrintUi();
     bindForms();
     bindAllDay();
     loadBuilding();
@@ -430,4 +612,6 @@
 
   window.addEventListener("online", window.Ui.setConnectionStatus);
   window.addEventListener("offline", window.Ui.setConnectionStatus);
+  window.addEventListener("beforeprint", prepareOccupancyPrint);
+  window.addEventListener("afterprint", invalidateOccupancyPrint);
 })();

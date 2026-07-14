@@ -27,6 +27,7 @@
     <link rel="stylesheet" href="assets/css/app.css">
   </head>
   <body>
+    <section id="occupancyPrint" aria-label="{{printTitle}}"></section>
     <a class="skip-link" href="#main">{{skipLink}}</a>
 
     <header class="site-header">
@@ -102,7 +103,8 @@
                   <option value="table">{{viewTable}}</option>
                 </select>
               </label>
-              <button class="button button-secondary" type="submit">{{updateAction}}</button>
+              <button class="button button-secondary" id="occupancyRefreshButton" type="submit">{{updateAction}}</button>
+              <button class="button button-secondary" id="occupancyPrintButton" type="button" disabled>{{printAction}}</button>
             </form>
             <p class="meta occupancy-meta" id="occupancyMeta" role="status" aria-atomic="true">{{notLoaded}}</p>
             <div id="occupancyList" class="list"></div>
