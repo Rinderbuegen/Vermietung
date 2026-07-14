@@ -268,6 +268,32 @@
     target.appendChild(section);
   }
 
+  function createPrintStatusPattern(document, status) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.classList.add("occupancy-print-status-pattern");
+    svg.dataset.status = status;
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-hidden", "true");
+
+    const lines = status === "busy"
+      ? [[0, 0, 100, 100], [0, 100, 100, 0]]
+      : status === "partial"
+        ? [[0, 100, 100, 0]]
+        : status === "blocked"
+          ? [[-50, 100, 50, 0], [-17, 100, 83, 0], [17, 100, 117, 0], [50, 100, 150, 0]]
+          : [];
+    lines.forEach(([x1, y1, x2, y2]) => {
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
+      svg.appendChild(line);
+    });
+    return svg;
+  }
+
   function renderPrintMonth(document, month, itemsByDate, range) {
     const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
     const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -304,6 +330,7 @@
       } else {
         const status = window.FrontendCore.dayStatus(itemsByDate.get(date) || []);
         cell.classList.add(`is-${status}`);
+        cell.appendChild(createPrintStatusPattern(document, status));
       }
       days.appendChild(cell);
     }
@@ -326,9 +353,9 @@
     entries.forEach(([status, label]) => {
       const entry = document.createElement("span");
       entry.className = "occupancy-print-legend-entry";
-      const pattern = document.createElement("i");
-      pattern.className = `is-${status}`;
-      pattern.setAttribute("aria-hidden", "true");
+      const pattern = document.createElement("span");
+      pattern.className = `occupancy-print-legend-symbol is-${status}`;
+      pattern.appendChild(createPrintStatusPattern(document, status));
       const text = document.createElement("span");
       text.textContent = label;
       entry.append(pattern, text);

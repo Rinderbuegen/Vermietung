@@ -51,7 +51,7 @@ def occupancy(building_id: str, requested_to: str) -> list[dict]:
         {"date": "2026-07-18", "from": "09:00", "to": "12:00", "allDay": False, "status": "belegt", "statusKey": "confirmed", "publicTitle": "**Frühstück**\n[Details](https://example.org/info) <img src=x onerror=alert(1)>", "publicOrganizer": "[Mail](mailto:verein@example.org)"},
         {"date": "2026-07-20", "from": "00:00", "to": "23:59", "allDay": True, "status": "gesperrt", "statusKey": "blocked", "publicTitle": "", "publicOrganizer": ""},
         {"date": "2026-07-21", "from": "15:00", "to": "18:00", "allDay": False, "status": "gesperrt", "statusKey": "blocked", "publicTitle": "Teilweise gesperrt", "publicOrganizer": ""},
-        {"date": "2026-07-22", "from": "10:00", "to": "12:00", "allDay": False, "status": "belegt", "statusKey": "confirmed", "publicTitle": "", "publicOrganizer": ""},
+        {"date": "2026-07-22", "from": "00:00", "to": "23:59", "allDay": True, "status": "belegt", "statusKey": "confirmed", "publicTitle": "", "publicOrganizer": ""},
         {"date": "2026-07-23", "from": "10:00", "to": "12:00", "allDay": False, "statusKey": "unknown", "publicTitle": "Ä Ö Ü ä ö ü ß", "publicOrganizer": "", "privateNote": "DARF-NIE-GEDRUCKT-WERDEN"},
         {"date": "2026-07-24", "from": "10:00", "to": "12:00", "allDay": False, "publicTitle": "Leerer Status", "publicOrganizer": ""},
     ]
@@ -273,17 +273,26 @@ def main() -> None:
         assert "DARF-NIE-GEDRUCKT-WERDEN" not in page.locator("#occupancyPrint").inner_text()
         assert request_count["occupancy"] == before_print
 
+        page.locator("#occupancyRange").select_option("current-month")
+        wait_for_occupancy_requests(page, before_print + 1)
+        page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
+        before_plan_print = request_count["occupancy"]
         page.locator("#occupancyView").select_option("plan")
         page.get_by_role("button", name="PDF erstellen / drucken").click()
         assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1
         assert page.locator("#occupancyPrint .occupancy-print-details-page").count() == 1
         assert page.locator("#occupancyPrint .occupancy-print-day-marker").count() == 0
         assert page.locator("#occupancyPrint .occupancy-print-legend-entry").all_inner_texts() == ["frei (leeres Feld)", "belegt (Kreuz)", "teilweise belegt (Diagonale)", "gesperrt (mehrfach schraffiert)"]
-        assert page.locator("#occupancyPrint .occupancy-print-legend-entry i").count() == 4
+        assert page.locator("#occupancyPrint .occupancy-print-legend-symbol").count() == 4
+        assert page.locator("#occupancyPrint .occupancy-print-legend-symbol .occupancy-print-status-pattern").evaluate_all("nodes => nodes.map(node => [node.dataset.status, node.getAttribute('aria-hidden'), node.querySelectorAll('line').length])") == [["free", "true", 0], ["busy", "true", 2], ["partial", "true", 1], ["blocked", "true", 4]]
+        assert page.locator("#occupancyPrint .occupancy-print-day.is-free .occupancy-print-status-pattern").evaluate_all("nodes => nodes.length > 0 && nodes.every(node => node.querySelectorAll('line').length === 0)")
+        assert page.locator("#occupancyPrint .occupancy-print-day.is-busy .occupancy-print-status-pattern").evaluate_all("nodes => nodes.length > 0 && nodes.every(node => node.querySelectorAll('line').length === 2)")
+        assert page.locator("#occupancyPrint .occupancy-print-day.is-partial .occupancy-print-status-pattern").evaluate_all("nodes => nodes.length > 0 && nodes.every(node => node.querySelectorAll('line').length === 1)")
+        assert page.locator("#occupancyPrint .occupancy-print-day.is-blocked .occupancy-print-status-pattern").evaluate_all("nodes => nodes.length > 0 && nodes.every(node => node.querySelectorAll('line').length === 4)")
         assert page.evaluate("window.__printCalls.length") == 2
         page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
         assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1
-        assert request_count["occupancy"] == before_print
+        assert request_count["occupancy"] == before_plan_print
         page.emulate_media(media="print")
         assert page.locator("#occupancyPrint").evaluate("node => getComputedStyle(node).display") == "block"
         assert page.locator("main").evaluate("node => getComputedStyle(node).display") == "none"

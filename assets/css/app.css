@@ -714,11 +714,12 @@ button:disabled .spinner {
     position: relative;
     display: flex;
     min-height: 8mm;
-    align-items: center;
+    align-items: flex-start;
     padding: 0.8mm;
     border: 0.6pt solid #000;
     font-size: 8pt;
     font-weight: 700;
+    overflow: hidden;
   }
 
   .occupancy-print-day.is-empty,
@@ -729,32 +730,17 @@ button:disabled .spinner {
   .occupancy-print-day.is-out-of-range { color: #777; }
   .occupancy-print-day-number { position: relative; z-index: 1; }
   .occupancy-print-day.is-busy { border-width: 1.4pt; }
-  .occupancy-print-day.is-busy::before,
-  .occupancy-print-day.is-partial::before,
-  .occupancy-print-day.is-blocked::before,
-  .occupancy-print-legend-entry i.is-busy::before,
-  .occupancy-print-legend-entry i.is-partial::before,
-  .occupancy-print-legend-entry i.is-blocked::before {
+
+  .occupancy-print-status-pattern {
     position: absolute;
     inset: 0;
-    content: "";
+    display: block;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
   }
 
-  .occupancy-print-day.is-busy::before,
-  .occupancy-print-legend-entry i.is-busy::before {
-    background: linear-gradient(to top right, transparent calc(50% - 0.7pt), #000 calc(50% - 0.7pt), #000 calc(50% + 0.7pt), transparent calc(50% + 0.7pt)), linear-gradient(to bottom right, transparent calc(50% - 0.7pt), #000 calc(50% - 0.7pt), #000 calc(50% + 0.7pt), transparent calc(50% + 0.7pt));
-  }
-
-  .occupancy-print-day.is-partial::before,
-  .occupancy-print-legend-entry i.is-partial::before {
-    background: linear-gradient(to top right, transparent calc(50% - 0.7pt), #000 calc(50% - 0.7pt), #000 calc(50% + 0.7pt), transparent calc(50% + 0.7pt));
-  }
-
-  .occupancy-print-day.is-blocked::before,
-  .occupancy-print-legend-entry i.is-blocked::before {
-    background: repeating-linear-gradient(to top right, transparent 0, transparent 2mm, #000 2mm, #000 2.7mm);
-  }
+  .occupancy-print-status-pattern line { stroke: #000; stroke-width: 1.4pt; }
 
   .occupancy-print-legend {
     display: flex;
@@ -765,14 +751,15 @@ button:disabled .spinner {
 
   .occupancy-print-legend h2 { width: 100%; }
   .occupancy-print-legend-entry { display: flex; align-items: center; gap: 1.5mm; font-weight: 700; }
-  .occupancy-print-legend-entry i {
+  .occupancy-print-legend-symbol {
     position: relative;
     display: block;
     width: 8mm;
     height: 5mm;
     border: 0.6pt solid #000;
+    overflow: hidden;
   }
-  .occupancy-print-legend-entry i.is-busy { border-width: 1.4pt; }
+  .occupancy-print-legend-symbol.is-busy { border-width: 1.4pt; }
 
   .occupancy-print-details { margin-top: 7mm; }
   .occupancy-print-details-page { break-before: page; page-break-before: always; }
