@@ -262,7 +262,8 @@ def main() -> None:
         before_print = request_count["occupancy"]
         page.get_by_role("button", name="PDF erstellen / drucken").click()
         assert page.evaluate("window.__printCalls.length") == 1
-        assert "Belegung drucken" in page.locator("#occupancyPrint").inner_text()
+        assert page.locator("#occupancyPrint .occupancy-print-header h1").inner_text() == "Belegung: Dorfgemeinschaftshaus Rinderbügen"
+        assert page.locator("#occupancyPrint .occupancy-print-header dt").all_inner_texts() == ["Zeitraum", "Ansicht", "Datenstand", "Erstellt am"]
         assert "DGH Abend 2026-08-31" in page.locator("#occupancyPrint").inner_text()
         assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 0
         assert page.locator("#occupancyPrint .booking-details.status-blocked .status-label").first.inner_text() == "gesperrt"
@@ -276,6 +277,9 @@ def main() -> None:
         page.get_by_role("button", name="PDF erstellen / drucken").click()
         assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1
         assert page.locator("#occupancyPrint .occupancy-print-details-page").count() == 1
+        assert page.locator("#occupancyPrint .occupancy-print-day-marker").count() == 0
+        assert page.locator("#occupancyPrint .occupancy-print-legend-entry").all_inner_texts() == ["frei (leeres Feld)", "belegt (Kreuz)", "teilweise belegt (Diagonale)", "gesperrt (mehrfach schraffiert)"]
+        assert page.locator("#occupancyPrint .occupancy-print-legend-entry i").count() == 4
         assert page.evaluate("window.__printCalls.length") == 2
         page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
         assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1

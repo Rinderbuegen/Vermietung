@@ -711,11 +711,10 @@ button:disabled .spinner {
   }
 
   .occupancy-print-day {
+    position: relative;
     display: flex;
     min-height: 8mm;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5mm;
     padding: 0.8mm;
     border: 0.6pt solid #000;
     font-size: 8pt;
@@ -728,11 +727,34 @@ button:disabled .spinner {
   }
 
   .occupancy-print-day.is-out-of-range { color: #777; }
-  .occupancy-print-day-marker { font-size: 7pt; }
-  .occupancy-print-day.is-free { border-style: solid; }
+  .occupancy-print-day-number { position: relative; z-index: 1; }
   .occupancy-print-day.is-busy { border-width: 1.4pt; }
-  .occupancy-print-day.is-partial { border-style: dashed; }
-  .occupancy-print-day.is-blocked { border-width: 1.4pt; border-style: double; }
+  .occupancy-print-day.is-busy::before,
+  .occupancy-print-day.is-partial::before,
+  .occupancy-print-day.is-blocked::before,
+  .occupancy-print-legend-entry i.is-busy::before,
+  .occupancy-print-legend-entry i.is-partial::before,
+  .occupancy-print-legend-entry i.is-blocked::before {
+    position: absolute;
+    inset: 0;
+    content: "";
+    pointer-events: none;
+  }
+
+  .occupancy-print-day.is-busy::before,
+  .occupancy-print-legend-entry i.is-busy::before {
+    background: linear-gradient(to top right, transparent calc(50% - 0.7pt), #000 calc(50% - 0.7pt), #000 calc(50% + 0.7pt), transparent calc(50% + 0.7pt)), linear-gradient(to bottom right, transparent calc(50% - 0.7pt), #000 calc(50% - 0.7pt), #000 calc(50% + 0.7pt), transparent calc(50% + 0.7pt));
+  }
+
+  .occupancy-print-day.is-partial::before,
+  .occupancy-print-legend-entry i.is-partial::before {
+    background: linear-gradient(to top right, transparent calc(50% - 0.7pt), #000 calc(50% - 0.7pt), #000 calc(50% + 0.7pt), transparent calc(50% + 0.7pt));
+  }
+
+  .occupancy-print-day.is-blocked::before,
+  .occupancy-print-legend-entry i.is-blocked::before {
+    background: repeating-linear-gradient(to top right, transparent 0, transparent 2mm, #000 2mm, #000 2.7mm);
+  }
 
   .occupancy-print-legend {
     display: flex;
@@ -742,10 +764,15 @@ button:disabled .spinner {
   }
 
   .occupancy-print-legend h2 { width: 100%; }
-  .occupancy-print-legend span { padding: 1mm 2mm; border: 0.6pt solid #000; font-weight: 700; }
-  .occupancy-print-legend .is-busy { border-width: 1.4pt; }
-  .occupancy-print-legend .is-partial { border-style: dashed; }
-  .occupancy-print-legend .is-blocked { border-width: 1.4pt; border-style: double; }
+  .occupancy-print-legend-entry { display: flex; align-items: center; gap: 1.5mm; font-weight: 700; }
+  .occupancy-print-legend-entry i {
+    position: relative;
+    display: block;
+    width: 8mm;
+    height: 5mm;
+    border: 0.6pt solid #000;
+  }
+  .occupancy-print-legend-entry i.is-busy { border-width: 1.4pt; }
 
   .occupancy-print-details { margin-top: 7mm; }
   .occupancy-print-details-page { break-before: page; page-break-before: always; }

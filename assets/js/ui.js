@@ -217,13 +217,12 @@
     const header = document.createElement("header");
     header.className = "occupancy-print-header";
     const title = document.createElement("h1");
-    title.textContent = texts.printTitle;
+    title.textContent = `${texts.occupancyTitle}: ${snapshot.buildingName || snapshot.building || texts.defaultBuilding}`;
     const fields = document.createElement("dl");
     const range = snapshot.range || {};
     const rangeText = range.from && range.to
       ? `${dateFormatter.format(new Date(`${range.from}T00:00:00`))} ${texts.timeUntil} ${dateFormatter.format(new Date(`${range.to}T00:00:00`))}`
       : "";
-    appendPrintField(document, fields, texts.printBuildingLabel, snapshot.buildingName || snapshot.building || texts.defaultBuilding);
     appendPrintField(document, fields, texts.printRangeLabel, rangeText);
     appendPrintField(document, fields, texts.printViewLabel, snapshot.view === "plan" ? texts.viewPlan : texts.viewTable);
     appendPrintField(document, fields, texts.printDataStatusLabel, snapshot.loadedAt ? dateTimeFormatter.format(new Date(snapshot.loadedAt)) : "");
@@ -304,11 +303,7 @@
         cell.classList.add("is-out-of-range");
       } else {
         const status = window.FrontendCore.dayStatus(itemsByDate.get(date) || []);
-        const marker = document.createElement("span");
-        marker.className = "occupancy-print-day-marker";
-        marker.textContent = ({ free: "F", busy: "B", partial: "T", blocked: "G" })[status];
         cell.classList.add(`is-${status}`);
-        cell.appendChild(marker);
       }
       days.appendChild(cell);
     }
@@ -322,16 +317,21 @@
     const title = document.createElement("h2");
     title.textContent = texts.legendLabel;
     const entries = [
-      ["free", "F", texts.statusFree],
-      ["busy", "B", texts.statusBusy],
-      ["partial", "T", texts.statusPartial],
-      ["blocked", "G", texts.statusBlocked]
+      ["free", texts.printLegendFree],
+      ["busy", texts.printLegendBusy],
+      ["partial", texts.printLegendPartial],
+      ["blocked", texts.printLegendBlocked]
     ];
     legend.appendChild(title);
-    entries.forEach(([status, marker, label]) => {
+    entries.forEach(([status, label]) => {
       const entry = document.createElement("span");
-      entry.className = `is-${status}`;
-      entry.textContent = `${marker} ${label}`;
+      entry.className = "occupancy-print-legend-entry";
+      const pattern = document.createElement("i");
+      pattern.className = `is-${status}`;
+      pattern.setAttribute("aria-hidden", "true");
+      const text = document.createElement("span");
+      text.textContent = label;
+      entry.append(pattern, text);
       legend.appendChild(entry);
     });
     target.appendChild(legend);
