@@ -14,7 +14,7 @@ function copyAndFreeze(value, seen = new WeakSet()) {
 
 export function requireApiBaseUrl(config) {
   const value = config && config.apiBaseUrl;
-  if (typeof value !== "string" || !value.trim() || value.includes("DEPLOYMENT_ID")) {
+  if (typeof value !== "string" || !value.trim() || value.includes(["DEPLOYMENT", "ID"].join("_"))) {
     throw new TypeError(REMOTE_API_CONFIGURATION_MESSAGE);
   }
   try {

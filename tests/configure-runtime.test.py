@@ -9,9 +9,16 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("configure_runtime", ROOT / "scripts/configure-runtime.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+build_spec = importlib.util.spec_from_file_location("build_pages_site", ROOT / "scripts/build-pages-site.py")
+build_module = importlib.util.module_from_spec(build_spec)
+build_spec.loader.exec_module(build_module)
+verify_spec = importlib.util.spec_from_file_location("verify_pages_site", ROOT / "scripts/verify-pages-site.py")
+verify_module = importlib.util.module_from_spec(verify_spec)
+verify_spec.loader.exec_module(verify_module)
 url = "https://script.google.com/macros/s/TEST_ID/exec"
 for source in ('{"apiBaseUrl": "alt"}', "{apiBaseUrl:'alt'}", '{ apiBaseUrl : "alt" }'):
     result, count = module.API_BASE_URL_PATTERN.subn(lambda match: match.group(1) + json.dumps(url), source, count=1)
@@ -67,4 +74,33 @@ with tempfile.TemporaryDirectory() as temp:
         worker_content = (scope / "service-worker.js").read_text(encoding="utf-8")
         assert f'CACHE_VERSION = "{digest}"' in worker_content
 
-print("Runtime-Injektion, URL-Validierung und Workerhash geprüft.")
+with tempfile.TemporaryDirectory() as temp:
+    site = Path(temp) / "_site"
+    original_build_site = build_module.SITE
+    original_verify_site = verify_module.SITE
+    original_argv = sys.argv
+    try:
+        build_module.SITE = site
+        build_module.main()
+        sys.argv = [str(ROOT / "scripts/configure-runtime.py"), url, str(site)]
+        module.main()
+        verify_module.SITE = site
+        for scope in verify_module.SCOPES:
+            verify_module.verify_scope(scope)
+        verify_module.verify_service_worker_registration()
+        verify_module.verify_final_artifact()
+
+        contaminated = site / "DGH/assets/js/config/runtime-config.js"
+        contaminated.write_text(contaminated.read_text(encoding="utf-8") + "\n// DEPLOYMENT_ID\n", encoding="utf-8")
+        try:
+            verify_module.verify_final_artifact()
+        except AssertionError as error:
+            assert "DEPLOYMENT_ID" in str(error)
+        else:
+            raise AssertionError("Finalprüfung hätte den echten Deployment-Marker ablehnen müssen.")
+    finally:
+        build_module.SITE = original_build_site
+        verify_module.SITE = original_verify_site
+        sys.argv = original_argv
+
+print("Runtime-Injektion, URL-Validierung, Workerhash und finales Deployment-Artefakt geprüft.")

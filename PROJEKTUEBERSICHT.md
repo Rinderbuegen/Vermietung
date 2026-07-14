@@ -2,7 +2,7 @@
 
 ## Stand
 
-Version 1.5.0. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
+Version 1.5.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
 
 ## Architektur
 
@@ -23,6 +23,7 @@ Version 1.5.0. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktan
 - Öffentliche Details: API-Schema 2 gibt optional `publicTitle` und `publicOrganizer` aus, ausschließlich mit fail-closed Master, Feldcheckbox und nicht leerem Text. Eingeschränktes Markdown wird im Browser über eine DOM-Whitelist gerendert.
 - Offlinecache: `occupancy:v3` hält pro Gebäude und Zeitraum höchstens 24 Stunden ausschließlich die öffentliche Feldprojektion `date`, `from`, `to`, `allDay`, `status`, `statusKey`, `publicTitle` und `publicOrganizer`; private oder unbekannte API-Felder werden verworfen.
 - Aktualisierungsschnitt 1.5.0: Für alte installierte PWA-Versionen gibt es keine Legacy-Skriptkompatibilität. Die PWA muss zur Aktualisierung online geöffnet werden; danach sind alle alten PWA-Fenster und Browser-Tabs zu schließen, bevor sie neu geöffnet wird.
+- Deployment-Fix 1.5.1: Die Laufzeitprüfung erkennt die Platzhalter-URL weiterhin, ohne den verbotenen Deployment-Marker selbst in das finale Pages-Artefakt einzubetten.
 
 ## Betrieb
 
