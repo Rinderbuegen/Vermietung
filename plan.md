@@ -1,1336 +1,642 @@
-# Implementierungsplan Version 1.3: Freigegebene öffentliche Buchungsdetails
+# Version 1.4: Belegungs-PDF, automatische Aktualisierung, Entfernen des „belegt“-Badges
 
-## Zweck und Arbeitsauftrag
+## 1. Zweck dieses Plans
 
-Dieser Plan beschreibt die vollständige Erweiterung der statischen PWA von Version 1.2 auf Version 1.3. Ziel ist, dass Betreiber pro bestätigter Buchung oder Sperrung einen öffentlichen Veranstaltungstext und einen öffentlichen Veranstalter bewusst freigeben können. Beide Texte dürfen eingeschränktes Markdown enthalten. Ohne ausdrückliche Freigabe darf die öffentliche API keine Details ausgeben.
+Dieser Plan ist der vollständige, ausführbare Implementierungsauftrag für ein ChatGPT-Terra-Modell ohne vorherigen Gesprächskontext. Er ersetzt den bisherigen historischen Inhalt von `plan.md`; die beschriebenen Änderungen sind noch **nicht** umgesetzt. Alle Produktentscheidungen sind abgeschlossen. Es gibt keine offenen Produktfragen und keine Varianten, über die das ausführende Modell erneut entscheiden soll.
 
-Der Plan ist für eine Implementierung in einem neuen Kontext ohne Kenntnis früherer Diskussionen geschrieben. Jeder Schritt ist in der angegebenen Reihenfolge abzuarbeiten. Abweichungen sind nur zulässig, wenn eine manuelle Live-Prüfung der privaten Google Sheets einen dokumentierten Widerspruch zum Repository ergibt.
+Die Umsetzung erweitert ausschließlich das bestehende öffentliche Frontend der Gebäudevermietung. Sie erzeugt eine druckoptimierte Belegungsansicht über den Browser-Druckdialog, aktualisiert Belegungsdaten automatisch bei einem Zeitraumwechsel und entfernt gezielt den redundanten Statusbadge „belegt“ aus einzelnen bestätigten Belegungseinträgen.
 
-Projektstand beim Erstellen dieses Plans:
+## 2. Auftrag
 
-- Statische PWA, dokumentierte Version 1.2.
-- Zwei öffentliche Pages-Scopes: `/DGH/` für `dgh_rb` und `/Gemeindehaus/` für `ev_gem_rb`.
-- Zwei getrennte private Google Sheets, zugeordnet in `betreiber/allgemein/backend/konfiguration.json`.
-- Eine gemeinsame standalone Apps-Script-Web-App als öffentliche API.
-- Je privatem Sheet ein eigenes gebundenes Verwaltungsskript.
-- GitHub Pages und Apps Script werden getrennt bereitgestellt.
+Folgende Ergebnisse sind gemeinsam als Feature Version 1.4 umzusetzen:
 
-## Ausführungsregeln für das implementierende Modell
+1. Im Belegungsbereich steht eine sichtbare Aktion **„PDF erstellen / drucken“** zur Verfügung.
+2. Diese Aktion bereitet synchron eine druckoptimierte A4-Hochformatansicht vor und öffnet anschließend `window.print()`. Der Browser-Druckdialog übernimmt PDF-Speicherung oder physischen Druck.
+3. Direktes Drücken von Strg+P beziehungsweise Cmd+P bereitet über `beforeprint` dieselbe Ansicht vor.
+4. Der Ausdruck basiert ausschließlich auf einem eingefrorenen Snapshot der bereits geladenen öffentlichen Belegungsdaten. Er liest keine Daten aus der sichtbaren DOM-Struktur und startet keinen API-Aufruf.
+5. Ein Wechsel des Zeitraums startet automatisch den API-Abruf. Ein Wechsel zwischen Plan- und Listenansicht rendert ausschließlich lokal aus den bereits geladenen Daten.
+6. Während eines Abrufs bleibt die bisherige Ansicht sichtbar, ist jedoch mit `inert` und `aria-busy` gegen Interaktion gesperrt. Auch der Export ist währenddessen gesperrt.
+7. Der manuelle Button **„Aktualisieren“** bleibt erhalten und darf keinen Doppel-Submit auslösen.
+8. Nur bei einzelnen Einträgen mit `statusKey === "confirmed"` entfällt der sichtbare Statusbadge. Statusanzeigen für `blocked` und unbekannte Status bleiben erhalten. Kalender, Legende und ARIA-Texte verwenden „belegt“ weiterhin unverändert.
+9. Die bestehende 24-Stunden-Datenschutzgrenze des lokalen öffentlichen Belegungscaches wird physisch eingehalten und auf die Keys des aktuellen Gebäudes begrenzt bereinigt.
+10. Nach vollständiger Featureimplementierung und grünen relevanten Tests wird die dokumentierte Frontend-Produktversion von `1.3.1` auf `1.4.0` erhöht, ausschließlich in `README.md` und `PROJEKTUEBERSICHT.md`; danach folgt der vollständige finale Verifikationslauf. Produkt-/Backendrelease sowie Apps-Script-/Sheet-Migration bleiben auf Stand `1.3`. Das öffentliche Occupancy-Response-Schema bleibt unverändert `schemaVersion: 2`.
 
-- [ ] Vor jeder Änderung `git status --short` ausführen und vorhandene fremde Änderungen notieren.
-- [ ] Keine fremden Worktree-Änderungen zurücksetzen, überschreiben oder bereinigen.
-- [ ] Ausschließlich Quellen ändern. `_site/**` nie manuell editieren.
-- [ ] `apps-script/buchungs-api/Code.gs` nie manuell editieren. Nur `apps-script/buchungs-api/Code.template.gs` und Betreiberkonfiguration ändern, danach `python scripts/build-apps-script.py` ausführen.
-- [ ] `DESIGN.md` als verbindliches Designsystem behandeln. Open Sans, bestehende Gebäude-Farben, eckige Komponenten und vorhandene CSS-Variablen beibehalten.
-- [ ] Keine neue Root-`package.json` und keine npm-Abhängigkeit hinzufügen.
-- [ ] Neue JavaScript-Tests nur mit Node-Bordmitteln wie `node:assert`, `node:fs`, `node:path` und `node:vm` schreiben.
-- [ ] Browsertests mit Python und Playwright schreiben; keine Produktions-URL, kein Produktionssecret und keine echten Formulardaten verwenden.
-- [ ] Version nur in den vorhandenen Dokumentationsstellen von 1.2 auf 1.3 anheben. Es existiert aktuell keine zentrale Paketversion.
-- [ ] Nach jeder Phase die zugehörigen Tests ausführen. Am Ende alle Befehle aus dem Kapitel „Vollständige Prüfbefehle“ in der angegebenen Reihenfolge ausführen.
-- [ ] Vor einem Deployment die privaten Live-Sheets manuell prüfen. Repository-Inhalte erlauben keine Aussage über aktuelle Live-Header, Formeln, Datenmengen, Checkboxvalidierungen oder doppelte Settings.
-- [ ] Nicht committen, solange kein ausdrücklicher Auftrag dazu vorliegt.
+## 3. Verbindliche Produktentscheidungen
 
-## Nicht verhandelbare Sicherheitsregeln
+Diese Entscheidungen stammen aus dem abgeschlossenen Grill-me und dürfen nicht neu verhandelt oder stillschweigend abgewandelt werden:
 
-- [ ] Öffentliche Details werden ausschließlich ausgegeben, wenn der neue Master `public_show_booking_details` wahr ist, das jeweilige Sichtbarkeitsfeld wahr ist und der zugehörige Text nach Normalisierung nicht leer ist.
-- [ ] `public_title` und `public_organizer` werden unabhängig voneinander freigegeben. Ein Feld darf nicht vom Flag des anderen Feldes abhängen.
-- [ ] Fehlende Sichtbarkeitsfelder sind immer `false`. Das gilt insbesondere in der Übergangsphase mit Version-1.2-Sheets.
-- [ ] Ein vorhandener, aber leerer neuer Master gilt als `false`. In diesem Fall darf der Legacy-Key nicht ausgewertet werden.
-- [ ] `public_show_booking_titles` wird nur gelesen, wenn `public_show_booking_details` als Key tatsächlich fehlt.
-- [ ] Der Legacy-Key wird in Version 1.3 nicht gelöscht.
-- [ ] Der bisherige Fallback `row.public_title || row.title` wird ersatzlos entfernt.
-- [ ] `title`, `note`, `internal_note`, `requester_name`, `requester_contact`, beide Sichtbarkeitsfelder und alle sonstigen privaten Sheet-Felder dürfen nie Bestandteil des öffentlichen API-JSON sein.
-- [ ] Neue Buchungen aus Anfragen und neue Sperrungen erhalten leere öffentliche Texte und echte boolesche `false`-Werte in beiden Sichtbarkeitsfeldern.
-- [ ] `Requests.note` bleibt unverändert der Text der anfragenden Person. Dieses Feld darf nie nach `Bookings.internal_note` kopiert oder öffentlich ausgegeben werden.
-- [ ] Nur `Requests.internal_note` wird beim Bestätigen nach `Bookings.internal_note` kopiert.
-- [ ] Eingeschränktes Markdown wird serverseitig nur als Text normalisiert. Der Server erzeugt kein HTML.
-- [ ] Der Browser erzeugt Buchungs-Markup ausschließlich über DOM-Knoten und eine feste Element-/Attribut-Whitelist. Keine Markdown-Eingabe darf in `innerHTML`, `insertAdjacentHTML` oder eine HTML-Templatezeichenfolge gelangen.
-- [ ] Der bestehende News-/About-Renderer `markdown()` in `assets/js/ui.js` wird nicht funktional umgebaut. Der neue Renderer wird ausschließlich für öffentliche Buchungsdetails verwendet.
-- [ ] Vollständige freigegebene Buchungsdetails werden absichtlich in `localStorage` gespeichert. Ablaufzeit ist exakt 24 Stunden ab `cachedAt`, nicht ab `loadedAt`.
-- [ ] Ein Cacheeintrag mit Alter `>= 86_400_000` Millisekunden wird gelöscht und nicht angezeigt.
-- [ ] Jede Nutzung von `JSON.parse`, `localStorage.getItem`, `localStorage.setItem` und `localStorage.removeItem` wird abgefangen. Security-, Quota- und Parse-Fehler dürfen die App nicht abbrechen.
-- [ ] Migrationen werden nie automatisch aus `doGet`, `doPost`, `setupSheets`, `onOpen` oder einem Trigger gestartet.
-- [ ] `migrateSheetsV13()` wird ausschließlich bewusst und manuell im Wartungsfenster ausgeführt.
-- [ ] Vor jeder Umschreibung werden beide Gebäude vollständig geprüft. Erst nach erfolgreichem Gesamt-Preflight beginnen Backups oder Änderungen.
-- [ ] Keine Aussage über globale Atomarität machen: Google Apps Script kann Änderungen an zwei getrennten Spreadsheets nicht gemeinsam transaktional zurückrollen.
+- Ausgabeweg: Browser-Druckdialog, kein direkter PDF-Download und keine clientseitige PDF-Datei-Erzeugung.
+- Buttontext: ehrlich und vollständig **„PDF erstellen / drucken“**.
+- Papierformat: A4, Hochformat.
+- Druckkopf: Gebäude, gewählter Zeitraum, gewählte Ansicht, Datenstand und Erstellungszeit vollständig ausgeben.
+- Kein zusätzlicher Persistenz- oder Cachehinweis im Ausdruck.
+- Offline- oder stale-basierter Export ist erlaubt, muss im Druckkopf deutlich als offline und/oder möglicherweise veraltet markiert werden.
+- Ein Zeitraum ohne Belegungseinträge ist exportierbar.
+- Listenansicht: ausschließlich eine formatierte Belegungsliste drucken, keinen Kalender ergänzen.
+- Planansicht: Monatskalender drucken und danach auf einer neuen Seite eine Detailliste ausgeben.
+- Zeitraumwechsel: automatisch API abrufen.
+- Ansichtswechsel: lokal rendern, kein API-Aufruf.
+- Manueller Aktualisieren-Button: bleibt erhalten.
+- Laden: alte Ansicht sichtbar lassen, aber mit `inert` und `aria-busy` sperren; Export ebenfalls sperren.
+- Bedeutung „Nächster Monat“: unverändert vom heutigen Datum bis zum Ende des nächsten Monats, nicht nur der isolierte nächste Kalendermonat.
+- Badgeänderung: nur der Eintragsbadge bestätigter Einträge entfällt. `blocked` bleibt sichtbar. Unbekannte Status bleiben sichtbar. Kalenderstatus, Legende und ARIA-Bezeichnung „belegt“ bleiben bestehen.
 
-## Ausgangslage und verifizierte Schwachstellen
+## 4. Nicht-Ziele
 
-Die folgenden Hinweise beziehen sich auf den Stand vor Version 1.3. Zeilennummern verschieben sich bei der Implementierung.
+- Kein serverseitiger oder direkter PDF-Generator.
+- Keine PDF-Bibliothek wie jsPDF, pdf-lib oder vergleichbare Abhängigkeit.
+- Kein Download-Endpunkt und keine Speicherung erzeugter PDFs.
+- Keine neue Backendfunktion, keine Änderung an Google Apps Script, Google Sheets, API-Schema oder Freigabelogik.
+- Keine Änderung an Buchungs- oder Kontaktformularen.
+- Keine Änderung an Manifest, Service-Worker-Quellcode, Buildskripten oder Deploymentkonfiguration.
+- Keine neue Persistenzform und keine Verlängerung der Cache-TTL.
+- Kein Druck privater Anfrage-, Kontakt-, Notiz- oder Formulardaten.
+- Keine Änderung der Statuslogik des Kalenders oder der Legende.
+- Keine Umdeutung von `next-month`.
+- Kein manueller Eingriff in generierte Dateien unter `_site/`.
 
-| Datei / Symbol | Aktueller Stand | Konkretes Risiko oder Defizit |
+## 5. Ist-Architektur und aktueller Datenfluss
+
+### 5.1 Statische Seite und Konfiguration
+
+- `index.html` enthält den Belegungsbereich `#belegung`, das Filterformular `#occupancyFilter`, die Zeitraumwahl `#occupancyRange`, die Ansichtswahl `#occupancyView`, den manuellen Submit-Button, den Status `#occupancyMeta` und die sichtbare Ausgabe `#occupancyList`.
+- `index.html` enthält außerdem `#bookingDetailsDialog` und private öffentliche Eingabeformulare für Buchungs- und Kontaktanfragen. Diese Formulare dürfen nie Teil des Print-DOM werden.
+- `config/config.js` ist kein Quellfile, sondern wird je Scope aus `betreiber/allgemein/konfiguration/frontend.json`, dem jeweiligen Gebäude-Override und den Texten erzeugt.
+- Sichtbare deutsche Texte kommen aus `betreiber/allgemein/texte/frontend.json`; die derzeit leeren Dateien `betreiber/DGH/texte/frontend.json` und `betreiber/EV_GEMEINDEHAUS/texte/frontend.json` sind optionale Overrides.
+- `scripts/build-pages-site.py::build_scope()` kopiert `assets/css` und `assets/js` automatisch in jeden Scope, rendert `index.html`, erzeugt `config/config.js`, ermittelt alle ausgelieferten Dateien und baut daraus Precache-Liste und Inhalts-Hash des Service Workers.
+
+### 5.2 Belegungszustand und Abruf
+
+- `assets/js/app.js` hält den Laufzeitzustand in `currentOccupancyPayload`, `currentOccupancyRange` und `currentOccupancyStale`.
+- `rangeFromSelection()` berechnet den gewünschten Zeitraum. Insbesondere liefert `next-month` heute bis zum Ende des nächsten Monats.
+- `loadOccupancy()` berechnet den Range, erhöht `occupancyRequestGeneration`, bricht über `occupancyAbortController` den vorherigen Request ab und ruft `fetchOccupancy()` auf.
+- `fetchOccupancy()` baut aktuell den öffentlichen GET-Request mit `action=occupancy`, `buildingId`, `from` und `to` direkt in `app.js` auf.
+- Der öffentliche Occupancy-Response und die gecachten Payloads verwenden unverändert `schemaVersion: 2`; dies ist unabhängig vom Produkt-/Backendrelease beziehungsweise Apps-Script-/Sheet-Migrationsstand `1.3`.
+- Erfolgreiche Daten werden in `loadOccupancy()` über `bookingItems()` um `requested`-Einträge bereinigt, mit `FrontendCore.sortOccupancyItems()` sortiert, in den drei Zustandsvariablen gespeichert und mit `writeOccupancyCache()` in `localStorage` abgelegt.
+- Bei einem Fehler versucht `readOccupancyCache()` einen passenden frischen Datensatz zu laden und markiert ihn als stale. Ohne Cache zeigt `Ui.renderEmpty()` einen Fehler.
+- Aktuell setzt der Submit-Handler des Filterformulars den Button-Ladezustand und ruft `loadOccupancy()` auf. Ein Zeitraumwechsel allein lädt noch nicht automatisch.
+- Der `change`-Handler von `#occupancyView` ruft `renderOccupancy()` mit dem aktuellen Payload lokal auf und erzeugt keinen Request.
+- Ein Klick auf einen Monatsnamen setzt den speziellen Range `selected-month`, wechselt zur Liste und ruft `loadOccupancy()` auf.
+
+### 5.3 Renderer
+
+- `assets/js/app.js::renderOccupancy()` wählt abhängig von `selectedView()` zwischen `Ui.renderOccupancyPlan()` und `Ui.renderOccupancy()`.
+- `assets/js/ui.js::renderOccupancy()` rendert die Listenansicht in `#occupancyList` und schreibt derzeit zugleich `#occupancyMeta`.
+- `assets/js/ui.js::renderOccupancyPlan()` rendert Monatskalender und Legende in `#occupancyList` und schreibt ebenfalls `#occupancyMeta`.
+- `assets/js/ui.js::renderMonth()` erzeugt Kalenderzellen. `FrontendCore.dayStatus()` priorisiert ganztägig `blocked`, danach ganztägig `confirmed`, danach `partial`, sonst `free`.
+- `assets/js/ui.js::renderBookingDetails()` erzeugt Datum, Zeit, Statusbadge sowie optional freigegebene Veranstaltung und Veranstalter. Die Detailtexte laufen durch `RestrictedMarkdown.render()` und dessen DOM-Whitelist.
+- `createBookingDetailsElement()` nutzt `renderBookingDetails()` für die Liste. `openBookingDetailsDialog()` nutzt denselben Renderer für den Dialog. Dieser gemeinsame Renderer ist deshalb der exakte Ort der Badgeänderung und soll auch vom Print-Renderer wiederverwendet werden.
+
+### 5.4 Cache
+
+- `assets/js/frontend-core.js` definiert `OCCUPANCY_CACHE_TTL_MS` als exakt 24 Stunden.
+- `occupancyCacheKey()` erzeugt `occupancy:v2:<buildingId>:<from>:<to>`.
+- `createOccupancyCacheRecord()` speichert `cachedAt` plus Payload.
+- `parseOccupancyCacheRecord()` klassifiziert Einträge als `fresh`, `expired` oder `invalid`.
+- Der aktuelle Code entfernt abgelaufene oder ungültige Records nur beim Lesen des gerade benötigten Keys. Andere abgelaufene Keys desselben Gebäudes können physisch bestehen bleiben.
+- Der Legacy-Key `occupancy:<buildingId>:<from>:<to>` wird derzeit exakt für den angefragten Zeitraum entfernt.
+
+### 5.5 Build und PWA
+
+- `scripts/build-pages-site.py` kopiert geänderte Quellassets automatisch in Root, `/DGH/` und `/Gemeindehaus/`.
+- Für die beiden Gebäudescopes werden Dateipfade und Dateiinhalte automatisch in `cache_digest()` gehasht und in den generierten Service Worker eingesetzt.
+- `tests/service-worker.test.js` und `scripts/verify-pages-site.py` prüfen Inhalts-Hash, Precache, Network-First für App-Shell-Assets sowie Scope-Isolation.
+- Daraus folgt: Änderungen an `index.html`, `assets/js/*`, `assets/css/app.css` und den Frontendtexten werden ohne Build- oder Service-Worker-Quelländerung automatisch kopiert, gehasht und gecacht.
+
+## 6. Soll-Architektur
+
+### 6.1 Zustandsgrenzen
+
+`app.js` bleibt Eigentümer aller Belegungsdaten und des asynchronen Ladeablaufs. `ui.js` bleibt Eigentümer der reinen DOM-Erzeugung. `frontend-core.js` erhält nur dann kleine pure Hilfsfunktionen, wenn Filter-, Sortier- oder Cachehygienelogik damit ohne Browser testbar wird; keine allgemeine Abstraktionsschicht einführen.
+
+Der gültige exportierbare Zustand besteht ausschließlich aus:
+
+- `currentOccupancyPayload`
+- `currentOccupancyRange`
+- `currentOccupancyStale`
+- dem beim Vorbereiten gelesenen Onlinezustand `navigator.onLine`
+- der beim Vorbereiten gelesenen Ansicht aus `#occupancyView`
+- der beim Vorbereiten erzeugten Erstellungszeit
+- dem Gebäudenamen aus der bereits vorhandenen `config`
+
+### 6.2 Eingefrorener Print-Snapshot
+
+Eine zentrale Funktion in `app.js`, beispielsweise `createOccupancyPrintSnapshot()`, muss:
+
+1. abbrechen, wenn gerade geladen wird oder Payload/Range fehlen;
+2. `currentOccupancyRange` kopieren und einfrieren;
+3. ausschließlich öffentliche Einträge aus `currentOccupancyPayload.items` übernehmen;
+4. jeden Eintrag auf die bereits vom öffentlichen Occupancy-Endpunkt gelieferten und für den Renderer benötigten Felder reduzieren, mindestens `date`, `from`, `to`, `allDay`, `status`, `statusKey`, `publicTitle`, `publicOrganizer`;
+5. alle Einträge inklusiv nach `range.from <= item.date <= range.to` filtern;
+6. das Ergebnis mit `FrontendCore.sortOccupancyItems()` stabil nach Datum, Start und Ende sortieren;
+7. Einträge, Array, Range und das Snapshot-Objekt über `Object.freeze()` gegen nachträgliche Mutation schützen;
+8. Ansicht, `loadedAt`, stale, `navigator.onLine`, Gebäude, Range und `createdAt` im Snapshot festhalten.
+
+Der Snapshot darf keine Referenz auf Formularzustände, Dialoginhalt oder private Daten enthalten. Kein `innerHTML`, `textContent`, `querySelector` über die sichtbare Belegung oder sonstiges DOM-Scraping zur Datengewinnung.
+
+### 6.3 Print-DOM
+
+- `index.html` erhält direkt unter `<body>` einen dedizierten, semantischen Print-Container, zum Beispiel `#occupancyPrint`, außerhalb von `<main>`, Dialog, Header, Footer und Formularen.
+- Der Container ist im Bildschirmmodus verborgen und wird ausschließlich für den Ausdruck befüllt/sichtbar gemacht.
+- Der Print-Container enthält nur die aus dem Snapshot gebauten öffentlichen Daten.
+- Ein zentraler UI-Einstieg, beispielsweise `Ui.renderOccupancyPrint(target, snapshot)`, leert und rendert den Container deterministisch.
+- Der vollständige Kopf enthält Gebäudename, lokal formatierten Zeitraum, Ansicht „Belegungsplan“ oder „Liste“, Datenstand aus `loadedAt` sowie lokale Erstellungszeit aus `createdAt`.
+- Bei `stale === true` steht deutlich „Möglicherweise veralteter Stand“ im Kopf.
+- Bei `online === false` steht zusätzlich deutlich „Offline erstellt“ im Kopf. Beide Marker können gleichzeitig erscheinen.
+- Es wird kein zusätzlicher Satz zur lokalen Speicherung oder Persistenz ausgegeben.
+- Die Listenansicht rendert nur Kopf und formatierte Liste beziehungsweise die formatierte Leermeldung.
+- Die Planansicht rendert Kopf, alle Monatskalender des Range, Legende und danach in einem Abschnitt mit erzwungenem Seitenumbruch die sortierte Detailliste beziehungsweise eine klare Leermeldung.
+- Kalender im Ausdruck sind nicht interaktiv: keine Buttons, keine Dialogverweise, keine Buchungsaktionen. Bestehende fachliche Monats-/Tagesstatuslogik wird wiederverwendet, aber in druckgeeignete semantische Elemente umgesetzt.
+- Detaileinträge verwenden `renderBookingDetails()`; dadurch gelten Markdown-Whitelist und Badgeentscheidung identisch in Liste, Dialog und Ausdruck.
+
+### 6.4 Print-Ablauf
+
+- Button-Klick: Snapshot synchron erzeugen, Print-DOM synchron rendern, danach direkt `window.print()` aufrufen.
+- Kein `await`, kein Timeout und kein API-Aufruf zwischen Benutzeraktion und `window.print()`.
+- `beforeprint`: dieselbe synchrone Vorbereitung ausführen, damit Strg+P/Cmd+P den aktuellen gültigen Zustand druckt.
+- `beforeprint` darf niemals Daten nachladen. Falls kein exportierbarer Payload vorhanden ist oder gerade `loadOccupancy()` läuft, muss es einen vorhandenen alten Print-Snapshot und den Print-DOM synchron leeren und darf insbesondere keinen zuvor vorbereiteten Range drucken. Der normale UI-Zustand wird dabei nicht verfälscht.
+- `afterprint` kann temporären Snapshotzustand verwerfen und den Container leeren oder für den nächsten synchronen Neuaufbau bereithalten. Er darf die sichtbare Belegung nicht verändern.
+- Bereits beim Start jedes neuen `loadOccupancy()`-Ladevorgangs und damit vor dem Request werden ein eventuell vorbereiteter Print-Snapshot und der Print-DOM synchron invalidiert beziehungsweise geleert. Erfolgreicher Abruf und Fehler ohne Cache halten diesen Zustand konsistent, damit nie versehentlich ein alter Range gedruckt wird.
+
+### 6.5 Renderer-Wiederverwendung
+
+- `renderBookingDetails(target, item)` bleibt die einzige Quelle für Datum, Zeit, Eintragsstatus und öffentliche Markdown-Details.
+- Listen-, Dialog- und Print-Detaileinträge rufen diesen Renderer auf.
+- Kalenderstatusberechnung bleibt in `FrontendCore.dayStatus()`.
+- Monatsiteration und Rangebehandlung dürfen minimal als wiederverwendbare pure Hilfen extrahiert werden, wenn Bildschirm- und Printkalender sonst unterschiedliche Fachlogik duplizieren würden.
+- Interaktive Bildschirm-Markupdetails und nicht interaktive Print-Markupdetails bleiben getrennt, damit keine versteckten Buttons, Dialogreferenzen oder Buchungsaktionen im Ausdruck landen.
+- `renderOccupancy()` und `renderOccupancyPlan()` schreiben künftig nur ihre jeweilige Zielansicht. Sie dürfen `#occupancyMeta` nicht mehr überschreiben.
+
+## 7. Refresh-State und Race-Condition-Design
+
+### 7.1 Zentrale Loadingsteuerung
+
+In `app.js` eine zentrale Funktion für den Belegungs-Ladezustand einführen, beispielsweise `setOccupancyLoading(isLoading, generation)`. Sie steuert gemeinsam:
+
+- den manuellen Aktualisieren-Button inklusive Spinner und Originaltext;
+- `aria-busy="true"` am Belegungs-Ausgabebereich während des Requests und Entfernung beziehungsweise `false` danach;
+- `inert` am alten sichtbaren Inhalt `#occupancyList` während des Requests;
+- Deaktivierung des Printbuttons während des Requests;
+- Schutz gegen Doppel-Submit des manuellen Buttons;
+- eine zentrale interne Boolean-/Generationsinformation für Printfreigabe und Ereignishandler.
+
+Die alte Ansicht bleibt optisch unverändert sichtbar. Nicht durch ein leeres Loading-Template ersetzen. Die Sperre muss sowohl Maus-/Touch- als auch Tastaturinteraktion verhindern. Der Status `#occupancyMeta` meldet zentral „Belegung wird aktualisiert …“.
+
+### 7.2 Generation und AbortController
+
+Die bestehenden Mechanismen `occupancyRequestGeneration` und `occupancyAbortController` werden auf **alle** Auslöser angewendet:
+
+- Initialabruf
+- automatischer Rangewechsel
+- Klick auf einen Monatsnamen
+- manueller Aktualisieren-Submit
+- Aktualisierung nach erfolgreicher Buchungsanfrage
+
+Ablauf je Request:
+
+1. gewünschten Range unmittelbar erfassen;
+2. bei **jedem** Eintritt in `loadOccupancy()` die Cachehygiene für das aktive Gebäude ausführen, unabhängig davon, ob der folgende Onlineabruf erfolgreich ist;
+3. alten Print-Snapshot und Print-DOM synchron invalidieren;
+4. Generation erhöhen;
+5. vorherigen Controller abbrechen;
+6. neuen Controller setzen;
+7. zentralen Loadingzustand für diese Generation aktivieren;
+8. mit `cache: "no-store"` und `signal` abrufen;
+9. Ergebnis nur übernehmen, wenn Generation aktuell und Signal nicht abgebrochen ist;
+10. Fehler/Cache nur für die aktuelle Generation verarbeiten;
+11. im `finally` Loadingzustand **nur** dann beenden, wenn die Generation weiterhin aktuell ist.
+
+Ein verspätetes Ergebnis A darf nach einem neueren Request B weder Payload, Range, stale, Meta, sichtbare Ansicht, Dialogzustand, Printzustand noch Loadingzustand überschreiben.
+
+### 7.3 Ereignisverhalten
+
+- `#occupancyRange change`: automatisch `loadOccupancy()` starten. Der manuelle Submit ist nicht erforderlich.
+- `#occupancyView change`: ausschließlich aktuellen Payload für den aktuellen Range lokal rendern. Requestzählung bleibt unverändert.
+- `#occupancyFilter submit`: Default verhindern und zentral `loadOccupancy()` auslösen. Ist derselbe Submit bereits aktiv, keinen zweiten Request starten.
+- Monatsklick: Range-Felder und `selected-month` setzen, Listenansicht wählen und genau einen Abruf starten. Das programmgesteuerte Setzen darf keinen zusätzlichen doppelten Change-Request erzeugen.
+- Erfolgreiche Buchungsanfrage: vorhandenen zentralen Refreshweg verwenden; keine parallele Sonderlogik.
+
+### 7.4 Meta-Eigentum
+
+Nur `app.js` setzt `#occupancyMeta` für die Belegung:
+
+- initial „Noch nicht geladen.“ aus dem Template;
+- während Laden „Belegung wird aktualisiert …“;
+- bei Erfolg „Stand: <Zeit>“;
+- bei Cachefallback „Möglicherweise veralteter Stand: <Zeit> · <Fehlerhinweis>“;
+- bei Fehler ohne Cache „Die Belegung konnte nicht geladen werden. <Fehler>“.
+
+`Ui.renderOccupancy()` und `Ui.renderOccupancyPlan()` dürfen das Meta nicht setzen. Damit kann ein lokaler View-Rerender weder Lade- noch Fehlerstatus überschreiben.
+
+### 7.5 Fehler- und Stale-Verhalten
+
+- Nur ein frischer, exakt zu Gebäude und angefragtem Range passender Cache darf als Fallback verwendet werden.
+- Fallback-Payload wird erneut um `requested` bereinigt, auf Range gefiltert und sortiert; `currentOccupancyStale = true`.
+- Ein API-Fehler mit frischem passendem Cache zeigt dessen Daten und markiert UI sowie Print-Snapshot deutlich stale.
+- Ein Fehler ohne passenden Cache setzt `currentOccupancyPayload = null`, `currentOccupancyRange = null` und `currentOccupancyStale = false`.
+- Bei Fehler ohne Cache werden sichtbarer Dialog, `dialogTrigger`, vorbereiteter Snapshot und Print-DOM geschlossen beziehungsweise geleert. Dies gilt auch, wenn vor dem fehlgeschlagenen Request B bereits Print A vorbereitet war; kein Inhalt von A darf erhalten oder exportierbar bleiben.
+- Die zuvor alte, während Laden sichtbare und inerte Ansicht wird nach finalem Fehler ohne Cache durch die Fehlermeldung ersetzt; anschließend wird der zentrale Loadingzustand korrekt beendet.
+- Ein Abort durch einen neueren Request ist kein sichtbarer Fehler.
+
+## 8. Badgeänderung
+
+Die Änderung erfolgt **exakt** in `assets/js/ui.js::renderBookingDetails()`:
+
+- Den Statusknoten nur erzeugen und an den Header anhängen, wenn `item.statusKey !== "confirmed"`.
+- Nicht anhand des lokalisierten Textes `item.status`, `statusText()` oder des Wortes „belegt“ filtern.
+- Kein globales CSS-Verstecken von `.status-confirmed`, `.status-label` oder Textinhalten.
+- `blocked` behält seinen roten sichtbaren Badge.
+- Unbekannte, leere oder neue Statuskeys behalten einen sichtbaren Fallbackbadge.
+- Weil Liste, Dialog und Printdetails denselben Renderer verwenden, gilt die Änderung automatisch in allen drei Kontexten.
+- `statusText("confirmed")`, `FrontendCore.dayStatus()`, Kalenderklassen `.is-busy`, Legende, Titel und ARIA-Labels bleiben unverändert und nennen weiterhin „belegt“.
+
+## 9. Cachehygiene
+
+### 9.1 Gültiger Namensraum
+
+Für den aktiven Scope darf nur das Präfix `occupancy:v2:<buildingId>:` inspiziert werden. Beispiele:
+
+- DGH: `occupancy:v2:dgh_rb:`
+- Gemeindehaus: `occupancy:v2:ev_gem_rb:`
+
+### 9.2 Bereinigungsregeln
+
+- Über `localStorage.length` und `localStorage.key(index)` defensiv eine Keyliste aufnehmen; Storagezugriffe können werfen.
+- Nur Keys entfernen, die exakt mit dem Präfix des aktuell konfigurierten Gebäudes beginnen.
+- Jeden passenden Record mit `FrontendCore.parseOccupancyCacheRecord()` prüfen.
+- Nur `expired` oder `invalid` physisch entfernen.
+- Frische Records anderer Ranges desselben Gebäudes behalten.
+- Keys des anderen Gebäudes, fremde Anwendungen und ähnlich benannte Keys nicht lesen, ändern oder entfernen.
+- Legacybereinigung bleibt exakt und gezielt: nur `occupancy:<buildingId>:<from>:<to>` für konkret verwendete Ranges entfernen. Kein pauschales `occupancy:`-Löschen.
+- Die Bereinigung ist verbindlich bei **jedem Start von `loadOccupancy()`** vor dem Netzwerkabruf auszuführen. Sie läuft damit auch bei dauerhaft erfolgreichen Onlineabrufen und darf nicht nur an Cachelesen oder Fehlerfallback gekoppelt sein.
+- Die TTL bleibt exakt `24 * 60 * 60 * 1000`; bei `age >= TTL`, Zukunftszeit, ungültigem JSON oder ungültigem Payload wird der Record physisch entfernt.
+- Schreibfehler, Quota-Fehler und blockierter Storage dürfen die UI nicht zum Absturz bringen.
+
+### 9.3 Tests der Isolation
+
+Tests müssen gleichzeitig Records für `dgh_rb`, `ev_gem_rb`, fremde Keys, gültige, ungültige und abgelaufene Records anlegen. Nach Hygiene dürfen nur ungültige/abgelaufene Records des aktiven Präfixes und der exakt adressierte Legacy-Key fehlen. Mindestens ein Browserfall muss einen erfolgreichen Onlineabruf beantworten und trotzdem nachweisen, dass alte `invalid`-/`expired`-Keys des aktiven Gebäudes bereits beim Start von `loadOccupancy()` physisch entfernt wurden.
+
+## 10. Print-CSS und Druckgestaltung
+
+In `assets/css/app.css` einen klar begrenzten `@media print`-Block ergänzen:
+
+- Ausschließlich `#occupancyPrint` drucken; Header, Hauptseite, Dialog, Footer, Formulare und alle sonstigen direkten Body-Inhalte ausblenden.
+- `#occupancyPrint` im Printmodus sichtbar machen und als normales Dokumentlayout positionieren.
+- Desktop-Sonderregeln aus dem bestehenden Media Query neutralisieren: `html`, `body` und `main` erhalten für Druck `height: auto`, `min-height: 0` und `overflow: visible`; Flex-/Viewportbegrenzungen dürfen keine Seiten abschneiden.
+- `@page { size: A4 portrait; margin: ...; }` mit einem praxistauglichen Rand, zum Beispiel 12 bis 15 mm.
+- Drucktypografie in pt beziehungsweise druckgeeigneten Größen definieren; Kopf kompakt, aber vollständig und lesbar.
+- Jahresansichten in sinnvolle Kalenderbreiten zerlegen. Pro A4-Seite höchstens so viele Monatsraster anordnen, dass Tageszahlen und Statusmuster lesbar bleiben; bevorzugt zwei Monate nebeneinander nur, wenn die Zellen nicht kollabieren, sonst ein Monat pro Zeile.
+- Monatskarten, einzelne Detaileinträge und zusammengehörige Überschriften mit `break-inside: avoid` beziehungsweise `page-break-inside: avoid` schützen.
+- Die Detailliste der Planansicht erhält `break-before: page` beziehungsweise kompatibel `page-break-before: always`.
+- Lange Links und Texte mit `overflow-wrap: anywhere` druckbar halten.
+- Umlaute, ß und eingeschränktes Markdown müssen sichtbar korrekt bleiben.
+- HTTPS- und `mailto:`-Links bleiben als sicher gerenderte Links erhalten. Keine automatische Ausgabe kompletter URL-Ziele erzwingen, wenn sie Layout oder Datenschutz verschlechtert.
+- Status darf nicht ausschließlich durch Hintergrundfarbe vermittelt werden. Für Schwarz-Weiß-Druck Rahmen, Muster und/oder eindeutige Symbole/Abkürzungen verwenden.
+- `frei`, `belegt`, `teilweise belegt` und `gesperrt` im Kalender sowohl visuell als auch textlich über die Legende unterscheidbar machen.
+- Druck mit deaktivierten Hintergrundgrafiken muss weiterhin verständlich sein.
+- Keine privaten Formularfelder, Consenttexte, Kontaktnachrichten oder Buchungsanfragedaten im Print-DOM oder Druck-CSS sichtbar machen.
+
+Im normalen Bildschirmmodus bleibt `#occupancyPrint` vollständig verborgen. Der neue Aktionsbutton folgt den bestehenden eckigen `.button`-/Designsystemregeln und bleibt bei 390 px Breite ohne horizontalen Overflow bedienbar.
+
+## 11. Datei-für-Datei-Anweisungen
+
+### 11.1 `index.html`
+
+- Im Belegungsfilter neben dem manuellen Aktualisieren-Button einen `type="button"` für **„PDF erstellen / drucken“** ergänzen.
+- Für beide Buttons stabile IDs oder eindeutige Data-Attribute vorsehen, damit Loading- und Testlogik nicht von sichtbarem Text abhängen.
+- Den Print-Container direkt unter `<body>` als Geschwister von Header/Main/Dialog/Footer anlegen, semantisch kennzeichnen und im Screenmodus verbergen.
+- Keine Belegungsdaten statisch duplizieren.
+- Keine Formulare oder Dialoge in den Print-Container verschieben.
+
+### 11.2 `assets/js/app.js`
+
+- Zentralen Occupancy-Loadingzustand einführen.
+- Bestehende Generation plus `AbortController` für alle Refreshauslöser konsistent verwenden.
+- `fetchOccupancy()` um `cache: "no-store"` ergänzen.
+- Rangewechsel automatisch binden; Viewwechsel lokal belassen; manuellen Submit gegen Doppel-Submit schützen.
+- Metaausgabe aus Renderern herausziehen und zentral verwalten.
+- Fehler ohne Cache vollständig aus Zustand, Dialog und Printzustand entfernen.
+- Cachehygiene ausschließlich für das aktive `occupancy:v2:<buildingId>:`-Präfix ergänzen, verbindlich bei jedem Start von `loadOccupancy()` ausführen und Legacy nur exakt entfernen.
+- Snapshot aus `currentOccupancyPayload`, `currentOccupancyRange`, `currentOccupancyStale` und `navigator.onLine` bauen, auf Range filtern, sortieren und einfrieren.
+- Printbutton, `beforeprint` und optional `afterprint` anbinden.
+- Synchrone Vorbereitung garantieren; kein Print-API-Aufruf und kein DOM-Scraping.
+- Nach Rangewechsel, neuer Generation oder Fehler vorbereiteten Printzustand invalidieren.
+
+### 11.3 `assets/js/ui.js`
+
+- `renderBookingDetails()` so ändern, dass exakt `statusKey === "confirmed"` keinen Badge erzeugt.
+- Bestehenden Detailrenderer für Printdetails wiederverwenden.
+- `renderOccupancy()` und `renderOccupancyPlan()` vom Meta entkoppeln.
+- Zielgerichtete Printrenderer für Kopf, Liste, leeren Zustand, nicht interaktiven Monatskalender, Legende und Plan-Detailliste ergänzen.
+- Bestehende Datumsformatierer, `RestrictedMarkdown.render()` und Statuslogik wiederverwenden.
+- Keine privaten Datenfelder akzeptieren oder rendern.
+- Falls Fehlerbereinigung dies benötigt, eine kleine öffentliche UI-Funktion zum sicheren Schließen/Leeren des Buchungsdialogs ergänzen, statt Dialoginternas aus `app.js` zu manipulieren.
+
+### 11.4 `assets/js/frontend-core.js` optional und minimal
+
+- Nur pure, browserunabhängig testbare Helfer ergänzen, wenn dadurch Rangefilterung oder gezielte Cachehygiene eindeutig und testbar wird.
+- Bestehende API nicht unnötig umbauen.
+- `OCCUPANCY_CACHE_TTL_MS`, `parseOccupancyCacheRecord()`, `sortOccupancyItems()` und `dayStatus()` semantisch stabil halten.
+- Keine DOM-, `window`-, `navigator`- oder Printabhängigkeit einführen.
+
+### 11.5 `assets/css/app.css`
+
+- Bildschirmstil für Printcontainer und neuen Button ergänzen.
+- Loadingzustand visuell verständlich machen, ohne alte Belegung auszublenden.
+- `@page` und vollständigen `@media print`-Block gemäß Abschnitt 10 ergänzen.
+- A4-Hochformat, Desktop-Overflowreset, Seitenumbrüche, Jahresansicht, Schwarz-Weiß-Unterscheidung und lange Markdownlinks absichern.
+- Keine globale Regel ergänzen, die bestätigte Statusbadges anhand CSS versteckt.
+
+### 11.6 Frontendtexte
+
+- In `betreiber/allgemein/texte/frontend.json` alle neuen sichtbaren Texte als deutsche Keys ergänzen, mindestens Buttontext, Printüberschrift, Kopfbezeichnungen, Ansichtsnamen im Ausdruck sowie Offline-/stale-Markierungen.
+- Bestehende Schlüssel wie `statusBusy`, `statusBlocked`, `statusStale`, `occupancyEmpty`, `viewPlan` und `viewTable` wiederverwenden, soweit Wortlaut und Kontext passen.
+- Kein zusätzlicher Persistenzhinweis für den Ausdruck.
+- `betreiber/DGH/texte/frontend.json` und `betreiber/EV_GEMEINDEHAUS/texte/frontend.json` leer lassen, solange kein tatsächlich gebäudespezifischer Wortlaut nötig ist.
+- Deutsche Rechtschreibung mit echten Umlauten und ß verwenden, nicht `ae`, `oe`, `ue` oder `ss` als Ersatz.
+
+### 11.7 `tests/frontend-core.test.js`
+
+- Pure Rangefilter-/Sortierlogik testen, falls nach `frontend-core.js` extrahiert.
+- TTL-Grenzen `TTL - 1` und exakt `TTL` beibehalten.
+- Invalid-, Zukunftszeit- und Payloadformate abdecken.
+- Cachepräfix-Isolation und gezielte Entfernung testbar machen, falls die Hygiene pure Core-Helfer erhält.
+- `dayStatus()` unverändert für confirmed/blocked/partial/free absichern.
+
+### 11.8 `tests/browser.test.py`
+
+- Bestehende Playwright-Mocks um Requestzählung, kontrolliert verzögerte A/B-Antworten, leere Antworten und Online-/Offlinefälle erweitern.
+- Vor Ausführung der App `window.fetch` per `context.add_init_script()` instrumentieren: Für jeden Request mit `action=occupancy` URL und übergebenes Optionsobjekt beziehungsweise mindestens `options.cache` protokollieren. Nach Initialabruf, Rangewechsel, manuellem Refresh und Race-Requests muss für **jeden** protokollierten Occupancy-Fetch `options.cache === "no-store"` gelten; ein fehlendes Optionsobjekt oder fehlender `cache`-Wert ist ein Testfehler.
+- Badgeverhalten in Liste, Dialog und Print prüfen.
+- Printbutton testen, indem `window.print` vor dem Klick instrumentiert wird; sicherstellen, dass Print-DOM synchron vor dem Aufruf fertig ist.
+- `beforeprint` direkt dispatchen und denselben Printinhalt prüfen. Zusätzlich Print A vorbereiten, Rangewechsel B starten und `beforeprint` während B noch lädt auslösen: Weder A noch B darf gedruckt werden, und der alte Print-DOM muss leer sein. B anschließend ohne Cache fehlschlagen lassen und erneut prüfen, dass kein Inhalt von A zurückkehrt.
+- Printmedienmodus aktivieren und prüfen, dass ausschließlich Print-DOM sichtbar ist.
+- Listen- und Planprint, Kopf, Seitenumbruchklasse/-CSS, leere Zeiträume, stale/offline, Links, Markdown, Umlaute und beide Gebäudescopes prüfen.
+- Keine echten externen Requests zulassen; Apps Script vollständig mocken.
+- Bestehenden 390-px-Test beibehalten und um neuen Button/Overflow ergänzen.
+
+### 11.9 `DESIGN.md`
+
+- Druckansicht als Bestandteil des Designsystems dokumentieren: A4 Hochformat, vollständiger Kopf, Listen-/Planstruktur, Schwarz-Weiß-Muster, Seitenumbrüche und Datenschutzgrenze.
+- Buchungsdetailregel aktualisieren: bestätigte Einträge zeigen keinen redundanten Badge; gesperrte und unbekannte Status zeigen ihn weiterhin.
+- Klarstellen, dass Kalender, Legende und ARIA „belegt“ weiterhin verwenden.
+
+### 11.10 `README.md`
+
+- Nach erfolgreicher Implementierung und grünen relevanten Featuretests Version `1.3.1` auf `1.4.0` erhöhen; anschließend die vollständige Qualitätsmatrix inklusive dieser Dokumentationsänderung erneut ausführen.
+- Belegungsdruck über Browser-Druckdialog, automatische Rangeaktualisierung und Offline-/stale-Kennzeichnung knapp dokumentieren.
+- Produkt-/Backendrelease und Apps-Script-/Sheet-Migration `1.3` nicht ändern; das öffentliche Occupancy-Response-Schema bleibt `schemaVersion: 2`.
+- Qualitätsmatrix nur anpassen, wenn ein tatsächlich neuer Testbefehl entsteht; ansonsten unverändert lassen.
+
+### 11.11 `PROJEKTUEBERSICHT.md`
+
+- Nach erfolgreicher Implementierung und grünen relevanten Featuretests Version `1.3.1` auf `1.4.0` erhöhen; anschließend die vollständige Qualitätsmatrix inklusive dieser Dokumentationsänderung erneut ausführen.
+- Runtimeabschnitt um lokalen Viewwechsel, automatischen Rangeabruf und snapshotbasierten Browserdruck ergänzen.
+- Datenschutzabschnitt um die Aussage ergänzen, dass der Ausdruck ausschließlich bereits öffentliche Occupancy-Daten enthält.
+- Projektübersicht weiterhin knapp und architekturorientiert halten.
+
+### 11.12 Generierte Dateien und historischer Plan
+
+- `_site/` wird **nie manuell geändert**. Es darf für Tests ausschließlich durch `python scripts/build-pages-site.py` neu erzeugt werden.
+- `plan.md` war der historische Plan und wird durch diesen neuen Plan vollständig ersetzt. Bei der späteren Produktimplementierung dient sie nur als Auftrag; sie darf nicht so umgeschrieben werden, als sei das Feature bereits umgesetzt, bevor alle Akzeptanzkriterien erfüllt sind.
+
+## 12. Nicht erforderliche Dateien und Begründung
+
+Folgende Bereiche benötigen für dieses Feature keine Änderung:
+
+- Backend und `apps-script/**`: Druck und Refresh verwenden den vorhandenen öffentlichen Occupancy-Endpunkt; dessen Response-Schema bleibt `schemaVersion: 2`.
+- Google-Sheets-Struktur sowie Produkt-/Backendrelease und Apps-Script-/Sheet-Migrationsstand `1.3`: keine neuen Datenfelder, Status oder Operationen.
+- `betreiber/**/backend/**`: keine Backendtexte oder Backendkonfiguration nötig.
+- `manifest.webmanifest` beziehungsweise Manifestquellen: keine Installations-, Start-URL-, Icon- oder Displayänderung.
+- `service-worker.js`: statische Assets werden bereits automatisch aus der erzeugten Scope-Dateiliste gecacht; API-Requests liegen außerhalb des Scopes und werden nicht vom Worker abgefangen.
+- `scripts/build-pages-site.py`: `index.html`, CSS, JS und Textkonfiguration werden bereits kopiert/gerendert. Der Inhalts-Hash ändert sich automatisch mit den Dateien.
+- sonstige Buildskripte: keine neue Assetart und keine externe Abhängigkeit.
+
+Falls die Umsetzung glaubt, eine dieser Dateien ändern zu müssen, zuerst den Plan erneut prüfen und die kleinste Frontendlösung wählen. Es gibt für die vereinbarten Anforderungen keinen technischen Zwang zu Backend-, Manifest-, Service-Worker- oder Buildänderungen.
+
+## 13. Schrittweise Implementierungsreihenfolge
+
+Jeder Schritt ist klein, einzeln überprüfbar und erst nach erfolgreicher Prüfung abzuhaken.
+
+- [ ] 1. Vor Beginn `git status --short` prüfen; vorhandene fremde Änderungen notieren und unangetastet lassen.
+- [ ] 2. `DESIGN.md`, aktuelle Belegungsfunktionen und bestehende Tests erneut lesen; keine Annahmen aus früheren Sessions verwenden.
+- [ ] 3. In `frontend-core.js` nur benötigte pure Range-/Cachehelfer ergänzen oder bewusst bei bestehenden Helfern bleiben.
+- [ ] 4. `tests/frontend-core.test.js` für jeden neuen Core-Helfer zuerst/parallel ergänzen und mit `node tests/frontend-core.test.js` grün machen.
+- [ ] 5. Deutsche Printtexte in `betreiber/allgemein/texte/frontend.json` ergänzen; Gebäude-Overrides nur bei echtem Unterschied anfassen.
+- [ ] 6. In `index.html` Printbutton und leeren Printcontainer direkt unter `body` ergänzen.
+- [ ] 7. In `ui.js` Meta-Schreiben aus Viewrenderern entfernen und Meta-Eigentum nach `app.js` verlagern.
+- [ ] 8. In `ui.js::renderBookingDetails()` ausschließlich den confirmed-Badge anhand `statusKey === "confirmed"` unterdrücken.
+- [ ] 9. Bestehende Browser-Badgeprüfungen für Liste und Dialog aktualisieren; blocked und unbekannt ausdrücklich absichern.
+- [ ] 10. Zentrale Loadingsteuerung in `app.js` einführen und manuellen Submit darauf umstellen.
+- [ ] 11. Range-Change-Autoload und lokalen View-Change implementieren; Requestzählung per Browsermock prüfen.
+- [ ] 12. Generation/Abort/finally für alle Trigger härten; A/B-Race automatisiert prüfen.
+- [ ] 13. `fetchOccupancy()` auf `cache: "no-store"` setzen.
+- [ ] 14. Cachehygiene für das aktive v2-Gebäudepräfix bei jedem Start von `loadOccupancy()` ausführen; Legacy nur exakt entfernen; Isolation und Bereinigung trotz erfolgreichem Onlineabruf automatisiert prüfen.
+- [ ] 15. Fehlerpfade zentralisieren: frischer Cache wird stale, fehlender Cache räumt Payload/Range/stale/Dialog/Printzustand vollständig.
+- [ ] 16. Snapshotfunktion implementieren und mit Rangefilter, stabiler Sortierung, Freeze, Onlinezustand und nur öffentlichen Feldern absichern.
+- [ ] 17. Nicht interaktive Printrenderer in `ui.js` implementieren; `renderBookingDetails()` für Detaileinträge wiederverwenden.
+- [ ] 18. Button-Klick, `beforeprint` und `afterprint` anbinden; synchronen Ablauf, null API-Requests beim Drucken sowie Print-A -> laufender Rangewechsel B -> `beforeprint` ohne alten Printinhalt testen.
+- [ ] 19. Screen- und Print-CSS einschließlich A4 Hochformat, Overflowreset, Seitenumbrüchen und Schwarz-Weiß-Mustern ergänzen.
+- [ ] 20. Automatisierte Printtests für Liste, Plan, leer, stale/offline, Markdown/Links/Umlaute, Jahresansicht und Datenschutz ergänzen.
+- [ ] 21. DGH und Gemeindehaus automatisiert sowie bei 390 px testen.
+- [ ] 22. `DESIGN.md` mit den tatsächlich implementierten Regeln aktualisieren.
+- [ ] 23. Implementierung mit den relevanten Featuretests einschließlich Frontend-Core-, Browser-, Print-, Cache- und Race-Tests grün prüfen; Versionsangaben dabei noch nicht ändern.
+- [ ] 24. `README.md` und `PROJEKTUEBERSICHT.md` fachlich aktualisieren und dort `1.3.1` auf `1.4.0` erhöhen; Produkt-/Backendrelease und Apps-Script-/Sheet-Migration `1.3` sowie `schemaVersion: 2` unverändert lassen.
+- [ ] 25. `_site/` ausschließlich per Build neu erzeugen und danach die vollständige Qualitätsmatrix als finalen Verifikationslauf inklusive der Dokumentations-/Versionsänderungen erneut ausführen.
+- [ ] 26. Lokal unter Windows verfügbare manuelle Browser-/PWA-Fälle durchführen. Safari Desktop, iOS Safari und installierte iOS-PWA als externen manuellen Abnahmeschritt auf Apple-Hardware einplanen; Ergebnis kurz im Arbeitsbericht oder PR dokumentieren, ohne dafür zwingend eine neue Repositorydatei anzulegen.
+- [ ] 27. Abschließenden Diff prüfen: keine privaten Daten, keine unnötige Bibliothek, keine unerwarteten Dateien, keine manuell editierten `_site`-Artefakte.
+
+## 14. Akzeptanzkriterien
+
+Das Feature ist nur akzeptiert, wenn alle folgenden Punkte erfüllt sind:
+
+### 14.1 Bedienung und Requests
+
+- Zeitraumwechsel startet ohne Submit genau einen Occupancy-Request für den neuen Range.
+- Ansichtswechsel Plan/Liste startet keinen Occupancy-Request.
+- Manueller Aktualisieren-Button bleibt vorhanden und startet genau einen Request.
+- Doppelklick/zweiter Submit während eines laufenden manuellen Requests startet keinen Doppelrequest.
+- `next-month` reicht weiterhin von heute bis zum Ende des nächsten Monats.
+- Während Laden bleibt alter Inhalt sichtbar, trägt `inert` und `aria-busy`, ist nicht fokussier-/klickbar und der Exportbutton ist deaktiviert.
+- Nach Abschluss wird nur die aktuelle Generation entsperrt.
+
+### 14.2 Race Conditions und Fehler
+
+- Bei A gefolgt von B wird A abgebrochen; selbst bei verspäteter A-Antwort bleibt B alleiniger Eigentümer von Payload, Range, Meta, Ansicht und Print.
+- Ein veraltetes `finally` von A entsperrt B nicht und aktiviert den Export nicht vorzeitig.
+- Jeder Occupancy-Fetch übergibt nachweislich ein Optionsobjekt mit `cache: "no-store"`; dies gilt für Initialabruf, Rangewechsel, manuellen Refresh und Race-Requests.
+- Frischer exakt passender Cache wird bei Netzfehler angezeigt und als stale markiert.
+- Abgelaufener, ungültiger, fremder oder rangefremder Cache wird nicht angezeigt.
+- Fehler ohne Cache entfernt alten exportierbaren Zustand, schließt/ leert Dialog und Print-DOM und zeigt eine klare Fehlermeldung.
+- Wurde Print A vorbereitet und startet danach Rangewechsel B, ist Print A sofort invalidiert. `beforeprint` während B lädt lässt den Print-DOM leer und druckt A nicht; schlägt B ohne Cache fehl, bleibt der Print-DOM leer und A kehrt nicht zurück.
+
+### 14.3 Badge
+
+- Confirmed-Einträge zeigen in Liste, Dialog und Printdetails keinen „belegt“-Badge.
+- Blocked-Einträge zeigen weiterhin „gesperrt“ mit sichtbarer Statuskennzeichnung.
+- Ein unbekannter Status zeigt weiterhin seinen gelieferten oder Fallbackstatus.
+- Kalender, Legende, Tooltips und ARIA-Texte zeigen confirmed weiterhin als „belegt“.
+- Die Umsetzung prüft `statusKey === "confirmed"`, nicht Textinhalt oder CSS.
+
+### 14.4 Druck
+
+- Der Button lautet exakt „PDF erstellen / drucken“.
+- Klick öffnet den Browser-Druckdialog über `window.print()`.
+- Strg+P/Cmd+P erzeugt über `beforeprint` dieselbe aktuelle Druckansicht.
+- Zwischen Druckauslösung und Dialog findet kein API-Aufruf statt.
+- Print-DOM basiert auf einem gefrorenen Daten-Snapshot und nicht auf sichtbarem DOM.
+- Kopf enthält Gebäude, Zeitraum, Ansicht, Datenstand und Erstellungszeit.
+- Offline und stale werden jeweils deutlich und kombinierbar markiert.
+- Kein zusätzlicher Persistenzhinweis erscheint.
+- Listenansicht druckt nur die formatierte Liste.
+- Planansicht druckt Monatskalender plus Detailliste nach Seitenumbruch.
+- Leere Zeiträume sind in beiden Ansichten sinnvoll exportierbar.
+- Nur Print-DOM ist im Druck sichtbar.
+- A4-Hochformat, lesbare Kalenderzellen, funktionierende Seitenumbrüche und keine abgeschnittenen Inhalte sind nachweisbar.
+- Status bleibt bei Schwarz-Weiß-Druck und deaktivierten Hintergrundgrafiken unterscheidbar.
+
+### 14.5 Datenschutz und Inhalte
+
+- Print-Snapshot und Print-DOM enthalten nur Datum, Zeit, öffentlichen Status, `publicTitle` und `publicOrganizer` sowie nicht personenbezogene Kopfdaten.
+- Keine Werte aus Buchungs-/Kontaktformularen, internen Notizen, Anfragehistorie oder nicht freigegebenen Feldern erscheinen.
+- Eingeschränktes Markdown verwendet weiterhin ausschließlich die bestehende DOM-Whitelist.
+- HTTPS-Links behalten `target="_blank"`, `rel="noopener noreferrer"` und Screenreaderhinweis; `mailto:` bleibt ohne unnötigen neuen Tab.
+- Raw HTML, Bilder, Scripts, Eventattribute sowie unsichere URL-Schemata bleiben ausgeschlossen.
+- Umlaute und ß werden korrekt dargestellt und gedruckt.
+
+### 14.6 Cache
+
+- Freshnessgrenze bleibt exakt 24 Stunden.
+- Bei Erreichen der TTL wird der Record nicht nur ignoriert, sondern physisch entfernt.
+- Ungültige Records des aktiven Gebäudepräfixes werden entfernt.
+- Auch ein erfolgreicher Onlineabruf entfernt beim Start von `loadOccupancy()` zuvor vorhandene `invalid`-/`expired`-Records des aktiven Gebäudepräfixes physisch.
+- Frische Records anderer Ranges des aktiven Gebäudes bleiben erhalten.
+- Keys des anderen Gebäudes und fremde Keys bleiben bytegenau unverändert.
+- Legacy wird nur für exakt adressierte Gebäude-/Range-Keys entfernt.
+
+### 14.7 Accessibility und Responsive
+
+- Printbutton ist ein echter fokussierbarer Button mit verständlichem Namen und sichtbarem Fokus.
+- Disabled-/Loadingzustand ist semantisch und visuell erkennbar.
+- `aria-busy` liegt am relevanten Belegungsbereich; `inert` verhindert Interaktion mit altem Inhalt.
+- Fokus bleibt nach lokalem View-Rerender und Dialogschließen gemäß bestehender Fokuslogik sinnvoll.
+- Ein Fehler/Rerender mit entferntem Dialogtrigger fokussiert weiterhin Ansicht oder Überschrift als Fallback.
+- Bei 390 px entsteht durch Filter, neuen Button, Kalender oder Details kein horizontaler Overflow.
+- Jahresansicht bleibt am Bildschirm und im Druck lesbar.
+
+### 14.8 Dokumentation und Version
+
+- `DESIGN.md` beschreibt Badge- und Printregeln.
+- `README.md` und `PROJEKTUEBERSICHT.md` nennen Version `1.4.0` und das neue Verhalten.
+- Produkt-/Backendrelease und Apps-Script-/Sheet-Migration bleiben `1.3`; das öffentliche Occupancy-Response-Schema bleibt `schemaVersion: 2`.
+- Keine Produktivdatei unter `_site/` wurde manuell bearbeitet.
+
+## 15. Umfangreiche Testmatrix
+
+### 15.1 Automatisierte Browserfälle
+
+| Bereich | Fall | Erwartung |
 |---|---|---|
-| `apps-script/buchungs-api/Code.template.gs:8-15`, `SHEET_HEADERS` | Bookings und Requests verwenden das Version-1.2-Schema. | Öffentlicher Veranstalter, Sichtbarkeitsflags und `Requests.internal_note` fehlen; `Bookings.internal_note` steht nicht am Zielende. |
-| `apps-script/buchungs-api/Code.template.gs:48-74`, `setupSheets()` / `setupSheetForBuilding()` | Header werden bei jedem Lauf ohne Inhaltsprüfung in Zeile 1 geschrieben. | Gefüllte Sheets können durch eine andere Headerreihenfolge semantisch beschädigt werden. |
-| `apps-script/buchungs-api/Code.template.gs:89-102`, `getOccupancy()` | Nur `public_show_booking_titles` steuert Titel. | Kein neuer Master, kein unabhängiger Veranstalter und keine per-Zeile-Freigabe. |
-| `apps-script/buchungs-api/Code.template.gs:286-295`, `publicOccupancyRow()` | `publicTitle` nutzt `row.public_title || row.title`. | Kritisches Privacy-Leck: Interner `title` kann als öffentlicher Ersatz ausgegeben werden. |
-| `apps-script/buchungs-api/Code.template.gs:257-263`, `appendRow()` | Feste Header aus `SHEET_HEADERS`; Werte über `data[header] || ""`. | Übergangsschemas werden nicht sauber unterstützt; echtes `false` wird in einen leeren String verwandelt. |
-| `apps-script/buchungs-api/Code.template.gs:334-339`, `sanitizeText()` | Alle Steuerzeichen einschließlich LF werden durch Leerzeichen ersetzt. | Mehrzeiliges eingeschränktes Markdown kann nicht erhalten bleiben. |
-| `apps-script/buchungs-api/Code.template.gs:342-347`, `formatCell()` | `String(value || "")`. | Boolesches `false` geht als leerer Wert verloren. |
-| `apps-script/buchungsverwaltung/Code.gs:46-121`, `approveSelectedRequest()` | `public_title` und `internal_note` werden leer initialisiert. | Neue Felder fehlen; `Requests.internal_note` wird nicht übertragen. |
-| `apps-script/buchungsverwaltung/Code.gs:216-251`, `confirmBlock()` | Sperrnotiz landet bereits in `internal_note`. | Grundidee ist richtig, aber neue öffentliche Felder und echte `false`-Flags fehlen. |
-| `apps-script/buchungsverwaltung/Code.gs:370-384`, `appendRow_()` | Tatsächliche Header werden gelesen, aber `data[h] || ''` wird verwendet. | Boolesches `false` wird nicht als Checkboxwert gespeichert. |
-| `assets/js/app.js:9-11`, `occupancyCacheKey()` | Key ist `occupancy:<buildingId>:<from>:<to>`. | Keine Schema-/Cacheversion. |
-| `assets/js/app.js:144-172`, `loadOccupancy()` | Payload wird ohne `cachedAt` und ohne TTL gespeichert; Storage-/Parse-Fehler sind ungefangen. | Beliebig alte Daten können erscheinen; kaputtes JSON oder blockierter Storage kann die App abbrechen. |
-| `assets/js/app.js:51-57`, `renderOccupancy()` | `stale` wird immer als `false` an UI-Funktionen übergeben. | Nach Ansichtswechsel verliert ein Offline-Fallback seinen sichtbaren stale-Zustand. |
-| `assets/js/ui.js:62-85`, `renderOccupancy()` | Liste kennt nur optionales `publicTitle`; Ausgabe wird als HTML-String gebaut. | Kein Veranstalter, kein eingeschränktes Markdown, kein gemeinsamer Detailrenderer mit Dialog. |
-| `assets/js/ui.js:105-115`, `itemStatus()` / `dayStatus()` | Ganztägige `blocked`- und `confirmed`-Einträge werden beide zu `busy`. | Gesperrte Tage sind im Kalender nicht rot unterscheidbar. |
-| `assets/js/ui.js:130-151`, `renderMonth()` | Belegte Tage sind `<span>`; nur freie Tage sind Buttons. | Belegte Tage öffnen keine Details und sind nicht als Dialog-Trigger zugänglich. |
-| `assets/js/ui.js:146-151`, `renderMonth()` | Monatsname ist nur Buttontext. | Keine semantische Monatsüberschrift. |
-| `index.html:100-108` | Ansicht heißt „Tabellarisch“; `occupancyList` besitzt `aria-live="polite"`; `occupancyMeta` ist nur ein Absatz. | Benennung ist falsch; eine große dynamische Liste wird unnötig komplett vorgelesen; Statusziel ist nicht sauber definiert. |
-| `assets/css/app.css:117-121` | `.meta` ist für dunklen Header auf halbtransparentes Weiß gesetzt. | `#occupancyMeta` liegt auf weißer Panel-Fläche und hat dadurch unzureichenden Kontrast. |
-| `assets/css/app.css:426-435` | Tageszellen haben nur 34 px Mindesthöhe. | Interaktionsziel unterschreitet die angestrebten 44 px. |
-| `betreiber/allgemein/konfiguration/frontend.json:3` | `publicShowBookingTitles` wird als Frontendkonfiguration ausgeliefert. | Die Eigenschaft wird im aktuellen Frontend nicht genutzt und suggeriert eine clientseitige Sicherheitsentscheidung. |
-| `betreiber/allgemein/backend/konfiguration.json:10,20` | Backend-Startwert heißt `publicShowBookingTitles`. | Benennung bildet den neuen Master für beide Detailfelder nicht ab. |
-| `betreiber/DGH/texte/about.md:9,13` und `betreiber/EV_GEMEINDEHAUS/texte/about.md:13,17` | Texte behaupten „nur belegt“ und vollständige Löschung am Folgetag. | Beides widerspricht dem neuen Feature; die Löschbehauptung ist im Code nicht implementiert. |
-| `.github/workflows/pages.yml` | Nur Push auf `main`; bestehende Buildtests, kein Browser- oder neuer Node-Test. | Neue Sicherheitslogik wird nicht vollständig in CI abgesichert; Pull Requests haben keinen eigenen Qualitätslauf. |
-
-## Abgenommene Entscheidungen
-
-- [ ] Feature-Version ist 1.3.
-- [ ] `public_show_booking_details` ist ein je Gebäude im privaten `Settings`-Tab gespeicherter Master. „Global“ bedeutet: Er gilt für beide Detailfelder dieses Gebäudes, nicht für alle Gebäude gemeinsam.
-- [ ] Der Legacy-Key `public_show_booking_titles` bleibt in Version 1.3 im Sheet erhalten und wird nur als Fallback gelesen, wenn der neue Key fehlt.
-- [ ] Das API-Schema wird additiv auf `schemaVersion: 2` erweitert.
-- [ ] `publicTitle` und `publicOrganizer` sind im API-JSON immer Strings. Nicht freigegebene oder leere Werte sind `""`.
-- [ ] Sichtbarkeitsflags werden nie an den Browser gesendet.
-- [ ] Beide öffentlichen Texte erlauben maximal 1000 Zeichen nach Zeilenendennormalisierung und vor der API-Ausgabe.
-- [ ] Der Server normalisiert `CRLF` und einzelnes `CR` zu `LF`, behält `LF` und entfernt alle übrigen C0-Steuerzeichen sowie DEL. Er erzeugt kein HTML.
-- [ ] Der Buchungs-Markdownrenderer ist eine neue, klar abgegrenzte Datei `assets/js/restricted-markdown.js`.
-- [ ] Cache- und weitere browserunabhängige Kernlogik liegt in der neuen Datei `assets/js/frontend-core.js`, damit `tests/frontend-core.test.js` ohne DOM und ohne npm laufen kann.
-- [ ] Beide neuen Dateien unterstützen Browser und Node über einen kleinen UMD-artigen Export: Browser-Global `window.RestrictedMarkdown` beziehungsweise `window.FrontendCore`, Node über `module.exports`.
-- [ ] `index.html` lädt `frontend-core.js` und `restricted-markdown.js` vor `ui.js` und `app.js`.
-- [ ] Listenansicht und Dialog rufen dieselbe Funktion `renderBookingDetails(target, item)` in `assets/js/ui.js` auf. Es gibt keine zweite Feldformatierung.
-- [ ] Der native Dialog ist einmal statisch in `index.html` vorhanden. Tagesdialoge werden nicht als HTML-Strings pro Kalenderzelle erzeugt.
-- [ ] Freie Tage behalten `data-booking-date`. Nicht freie Tage erhalten stattdessen `data-occupancy-date`, `aria-haspopup="dialog"` und `aria-controls="bookingDetailsDialog"`.
-- [ ] Native Buttons liefern Enter- und Leertaste ohne eigene Tastatursimulation. Ein separater `keydown`-Handler für Buttonaktivierung wird nicht hinzugefügt.
-- [ ] Statuspriorität eines Tages: ganztägig `blocked` vor ganztägig `confirmed`, danach `partial`, sonst `free`.
-- [ ] Zeitweise Sperrungen bleiben `partial`; im Dialog und in der Liste tragen sie weiterhin das rote `blocked`-Statusbadge.
-- [ ] Cachezeitpunkt `cachedAt` wird als Millisekunden seit Unix-Epoch gespeichert. `loadedAt` bleibt nur Anzeigeinformation der API.
-- [ ] Der Cache ist bei `now - cachedAt < 86_400_000` gültig. Bei exakt 24:00 Stunden ist er ungültig.
-- [ ] Ein Cachezeitpunkt in der Zukunft ist ungültig und wird gelöscht, damit Uhrfehler nicht zu unbegrenzter Gültigkeit führen.
-- [ ] Die alten unversionierten Keys werden nicht gelesen. Beim Zugriff auf denselben Bereich wird der exakt berechenbare alte Key gezielt und fehlergeschützt entfernt; es wird nicht ungefiltert der gesamte `localStorage` geleert.
-- [ ] `setupSheets()` bleibt für neue leere Installationen zuständig. Es validiert bestehende Tabs, führt aber keine Datenmigration aus.
-- [ ] `migrateSheetsV13()` ist der einzige Einstieg für die Datenmigration gefüllter Version-1.2-Tabs.
-- [ ] Blockgröße für Apps-Script-Migrationslesen und -schreiben ist 500 Datenzeilen. Dadurch bleiben Speicher- und Laufzeitbedarf begrenzt.
-- [ ] Die Migration repariert bei einem bereits exakten Zielschema nur fehlende Format-/Checkboxvalidierungen. Sie ordnet keine Daten erneut um und erzeugt dafür kein neues Backup.
-- [ ] Die CI erhält einen `pull_request`-Qualitätslauf. Deployment und Secrets bleiben auf Push `main` oder manuellen Lauf beschränkt.
-
-## Zielschemas
-
-### Bookings Version 1.3
-
-Exakte Reihenfolge, keine zusätzlichen oder fehlenden Header:
-
-```text
-booking_id | building_id | date | from | to | title | status | public_title | public_title_visible | public_organizer | public_organizer_visible | created_at | updated_at | internal_note
-```
-
-Feldregeln:
-
-| Feld | Typ / Inhalt | Öffentlich |
-|---|---|---|
-| `booking_id` | UUID | Nein |
-| `building_id` | `dgh_rb` oder `ev_gem_rb` | Nein; Gebäude ist bereits Request-Kontext. |
-| `date` | `YYYY-MM-DD` | Ja |
-| `from` | `HH:MM` | Ja |
-| `to` | `HH:MM` | Ja |
-| `title` | Interner Buchungszweck | Nie |
-| `status` | `confirmed`, `blocked` oder interner sonstiger Status | Nur übersetzter öffentlicher Status für bestätigte/gesperrte Einträge |
-| `public_title` | Eingeschränktes Markdown, maximal 1000 Zeichen | Nur mit Master und eigenem Flag |
-| `public_title_visible` | Google-Sheets-Checkbox, echter Boolean | Nie direkt |
-| `public_organizer` | Eingeschränktes Markdown, maximal 1000 Zeichen | Nur mit Master und eigenem Flag |
-| `public_organizer_visible` | Google-Sheets-Checkbox, echter Boolean | Nie direkt |
-| `created_at` | ISO-Zeitstempel | Nein |
-| `updated_at` | ISO-Zeitstempel | Nein |
-| `internal_note` | Interner Betreibervermerk | Nie |
-
-Migrationsregel: Der bestehende Wert aus `Bookings.internal_note` wird werttreu anhand des Headernamens gelesen und an die letzte Zielposition geschrieben. Er darf nicht anhand seiner bisherigen Spaltennummer behandelt werden.
-
-### Requests Version 1.3
-
-Exakte Reihenfolge, keine zusätzlichen oder fehlenden Header:
-
-```text
-request_id | building_id | date | from | to | requester_name | requester_contact | title | note | status | conflict | created_at | updated_at | internal_note
-```
-
-Feldregeln:
-
-| Feld | Bedeutung |
-|---|---|
-| `note` | Freitext der anfragenden Person; bleibt von Betreiber-Notizen getrennt. |
-| `internal_note` | Neuer interner Betreibervermerk; beim Bestätigen nach `Bookings.internal_note` kopieren. |
-| Alle übrigen Felder | Bedeutung bleibt wie in Version 1.2. |
-
-Neue öffentliche Formularanfragen schreiben `internal_note: ""`. Das öffentliche Formular erhält kein Feld zum Setzen von `internal_note`.
-
-### Exakte Legacy-Schemas für den Preflight
-
-Nur diese beiden Version-1.2-Schemas dürfen als migrierbar gelten:
-
-```text
-Bookings:
-booking_id | building_id | date | from | to | title | status | public_title | internal_note | created_at | updated_at
-
-Requests:
-request_id | building_id | date | from | to | requester_name | requester_contact | title | note | status | conflict | created_at | updated_at
-```
-
-Für `Buildings`, `Settings`, `Log` und `Contacts` bleibt das aktuelle `SHEET_HEADERS`-Schema unverändert und muss exakt stimmen. Unbekannte Header, doppelte Header, leere Header innerhalb der genutzten Kopfzeile, fehlende Header oder eine andere Reihenfolge führen zum Abbruch.
-
-## Öffentlicher API-Vertrag Version 2
-
-### Endpoint
-
-```text
-GET <exec-url>?action=occupancy&buildingId=dgh_rb&from=2026-07-01&to=2026-07-31
-```
-
-### Erfolgsbeispiel
-
-```json
-{
-  "ok": true,
-  "data": {
-    "schemaVersion": 2,
-    "loadedAt": "2026-07-14T10:15:00.000Z",
-    "items": [
-      {
-        "date": "2026-07-18",
-        "from": "18:00",
-        "to": "22:00",
-        "allDay": false,
-        "status": "belegt",
-        "statusKey": "confirmed",
-        "publicTitle": "**Sommerkonzert**\nEinlass ab 17:30 Uhr",
-        "publicOrganizer": "[Kulturverein](https://example.org/veranstaltungen)"
-      },
-      {
-        "date": "2026-07-21",
-        "from": "00:00",
-        "to": "23:59",
-        "allDay": true,
-        "status": "gesperrt",
-        "statusKey": "blocked",
-        "publicTitle": "",
-        "publicOrganizer": ""
-      }
-    ]
-  },
-  "message": "OK"
-}
-```
-
-### Ausgabeentscheidung pro Feld
-
-| Neuer Master vorhanden? | Neuer Master wahr? | Legacy-Master wahr? | Feldflag wahr? | Text nach Normalisierung leer? | Ausgabe |
-|---|---:|---:|---:|---:|---|
-| Ja | Ja | Beliebig | Ja | Nein | Normalisierter Text |
-| Ja | Ja | Beliebig | Nein oder fehlt | Beliebig | `""` |
-| Ja | Ja | Beliebig | Ja | Ja | `""` |
-| Ja | Nein oder leer | Wahr | Ja | Nein | `""`; Legacy wird nicht gelesen |
-| Nein | Nicht anwendbar | Wahr | Ja | Nein | Normalisierter Text als Übergangsverhalten |
-| Nein | Nicht anwendbar | Falsch, leer oder fehlt | Ja | Nein | `""` |
-| Nein | Nicht anwendbar | Wahr | Flag fehlt | Nein | `""` |
-
-Die Matrix wird separat für `public_title`/`public_title_visible` und `public_organizer`/`public_organizer_visible` angewendet.
-
-### Verbotene API-Eigenschaften
-
-Folgende Namen dürfen in keinem Objekt unter `data.items` vorkommen:
-
-```text
-booking_id
-building_id
-title
-note
-internal_note
-requester_name
-requester_contact
-public_title
-public_title_visible
-public_organizer
-public_organizer_visible
-created_at
-updated_at
-```
-
-`publicTitle` und `publicOrganizer` sind die einzigen öffentlichen Detailfelder. Ein Test muss zusätzlich Geheimmarker in allen privaten Feldern setzen und die serialisierte Antwort auf Abwesenheit dieser Marker prüfen.
-
-## Architektur und Datenfluss
-
-### Vor Version 1.3
-
-```text
-Google Sheet Bookings
-  -> Code.template.gs / getOccupancy()
-  -> publicOccupancyRow(showTitles)
-  -> publicTitle mit möglichem Fallback auf internes title
-  -> assets/js/api.js
-  -> assets/js/app.js
-  -> assets/js/ui.js: Liste oder kompakter Kalender
-  -> unbefristeter localStorage-Fallback
-```
-
-### Nach Version 1.3
-
-```text
-Google Sheet Bookings
-  -> Masterentscheidung mit New-Key-Presence-Test
-  -> unabhängige Freigabe je Text und Sichtbarkeitscheckbox
-  -> reine Textnormalisierung, kein HTML
-  -> API schemaVersion 2 mit publicTitle/publicOrganizer
-  -> assets/js/api.js reicht Daten unverändert weiter
-  -> assets/js/frontend-core.js prüft Sortierung und Cachealter
-  -> assets/js/app.js hält { payload, range, stale } als UI-Zustand
-  -> assets/js/ui.js ruft für Liste und Dialog renderBookingDetails()
-  -> assets/js/restricted-markdown.js baut Whitelist-DOM
-  -> localStorage { cachedAt, payload }, maximal 24 Stunden
-```
-
-### Build- und Deploymentfluss
-
-```text
-Code.template.gs + betreiber/allgemein/backend/*.json
-  -> python scripts/build-apps-script.py
-  -> apps-script/buchungs-api/Code.gs
-  -> separates Apps-Script-Deployment auf bestehender /exec-URL
-
-index.html + assets/** + betreiber/**
-  -> python scripts/build-pages-site.py
-  -> _site/**
-  -> python scripts/configure-runtime.py in CI
-  -> separates GitHub-Pages-Deployment
-```
-
-## Umsetzungsphasen in strikter Reihenfolge
-
-## Phase 0: Baseline sichern und Live-Prüfung vorbereiten
-
-Dateien: keine fachliche Änderung.
-
-Arbeitsschritte:
-
-- [ ] `git status --short` dokumentieren.
-- [ ] Alle vorhandenen Testbefehle im aktuellen Zustand ausführen: Apps-Script-Build, Pages-Build, Pages-Verifikation, beide Python-Tests und Service-Worker-Test.
-- [ ] Prüfen, dass `apps-script/buchungs-api/Code.gs` nach dem Build keine unerwartete Differenz zu den injizierten Template-/JSON-Quellen hat.
-- [ ] In beiden privaten Live-Sheets die exakten Headerzeilen der Tabs `Bookings`, `Requests`, `Settings`, `Buildings`, `Log` und `Contacts` manuell exportieren oder dokumentieren.
-- [ ] In beiden Live-Sheets Datenzeilenanzahl, vorhandene Formeln, Checkboxen und doppelte `(building_id, key)`-Settings manuell prüfen.
-- [ ] Keine Live-Sheet-Struktur aufgrund der Repository-Dokumentation annehmen.
-
-Akzeptanzkriterien:
-
-- [ ] Baseline-Tests sind grün oder bestehende Fehler sind vor der Implementierung schriftlich festgehalten.
-- [ ] Beide Gebäude wurden geprüft; abweichende Header oder Formeln sind als Blocker bekannt.
-- [ ] In dieser Phase wurde kein `setupSheets()` und keine Migration auf Produktion ausgeführt.
-
-Tests:
-
-```pwsh
-python scripts/build-apps-script.py
-python scripts/build-pages-site.py
-python scripts/verify-pages-site.py
-python tests/content-build.test.py
-python tests/configure-runtime.test.py
-node tests/service-worker.test.js
-```
-
-## Phase 1: Apps-Script-Pure-Logik und API-Vertrag fail closed implementieren
-
-Primärdatei: `apps-script/buchungs-api/Code.template.gs`.
-
-Generierte Datei: `apps-script/buchungs-api/Code.gs`, ausschließlich über Build erzeugen.
-
-Konfigurationsdatei: `betreiber/allgemein/backend/konfiguration.json`.
-
-Neue/zu ändernde Symbole:
-
-- `SHEET_HEADERS`
-- neue Konstante `LEGACY_SHEET_HEADERS_V12`
-- `getOccupancy(buildingId, from, to)`
-- `publicOccupancyRow(row, showDetails)` oder gleichwertig mit einem klar benannten Details-Boolean
-- neue Funktion `publicBookingDetailsEnabled(settings)`
-- neue Funktion `hasOwn(object, key)`
-- neue Funktion `normalizePublicMarkdown(value)`
-- `appendRow(buildingId, sheetName, data)`
-- `formatCell(value, header)`
-- neue Funktion `valueOrEmpty(value)`
-
-Genaue Änderungen:
-
-- [ ] `SHEET_HEADERS.Bookings` und `SHEET_HEADERS.Requests` exakt auf die Zielschemas setzen.
-- [ ] Die beiden aktuellen Version-1.2-Header als unveränderliche Arrays in `LEGACY_SHEET_HEADERS_V12` erfassen.
-- [ ] In `betreiber/allgemein/backend/konfiguration.json` die zwei Eigenschaften `publicShowBookingTitles` in `publicShowBookingDetails` umbenennen; beide Werte bleiben `false`.
-- [ ] `getOccupancy()` um `schemaVersion: 2` ergänzen.
-- [ ] Masterentscheidung nicht mit `settings.public_show_booking_details || ...` implementieren, weil ein vorhandener leerer Wert sonst fälschlich auf Legacy zurückfällt.
-- [ ] Mit `Object.prototype.hasOwnProperty.call(settings, "public_show_booking_details")` oder dem Helper `hasOwn()` zuerst die echte Key-Anwesenheit prüfen.
-- [ ] Wenn der neue Key vorhanden ist, ausschließlich dessen Wahrheitswert mit `isTruthy()` auswerten.
-- [ ] Nur wenn der neue Key fehlt, `public_show_booking_titles` als Legacy-Master auswerten.
-- [ ] In `publicOccupancyRow()` `publicTitle` nur aus `row.public_title` und `publicOrganizer` nur aus `row.public_organizer` bilden.
-- [ ] Beide Werte unabhängig mit Master, zugehörigem `*_visible` und nicht leerem normalisiertem Text absichern.
-- [ ] Fehlende Flags durch `isTruthy(undefined) === false` fail closed behandeln.
-- [ ] `normalizePublicMarkdown()` in dieser Reihenfolge implementieren: Null/Undefined zu leerem String; `\r\n` und `\r` zu `\n`; alle Steuerzeichen außer `\n` entfernen; auf 1000 Zeichen begrenzen; für die Leerheitsprüfung `trim()` verwenden, aber erhaltene interne LF nicht durch Leerzeichen ersetzen.
-- [ ] `normalizePublicMarkdown()` darf keine Tags entfernen, ersetzen oder HTML erzeugen. Raw HTML bleibt Text und wird erst im Browser als Textknoten sicher dargestellt.
-- [ ] `appendRow()` muss bei vorhandenen Sheets die tatsächliche Headerzeile lesen und gegen das für den Tab erlaubte Legacy- oder Zielschema validieren.
-- [ ] `appendRow()` muss neue leere Tabs mit dem Zielschema initialisieren.
-- [ ] `appendRow()` muss `false` erhalten: `value === null || value === undefined ? "" : value` statt `value || ""`.
-- [ ] `formatCell()` muss boolesche Werte als Boolean zurückgeben, Null/Undefined als `""` und Strings weiterhin getrimmt behandeln.
-- [ ] `createBookingRequest()` schreibt im Zielschema `internal_note: ""`; bei einem Legacy-Requests-Tab wird das zusätzliche Datenfeld wegen Header-Mapping sicher ignoriert.
-- [ ] Öffentliche Responses dürfen keine Sheet-Zeilenobjekte spreaden oder ungefiltert serialisieren.
-
-Akzeptanzkriterien:
-
-- [ ] API-Antwort enthält `schemaVersion: 2` und beide öffentlichen Felder als Strings.
-- [ ] Alle Freigabematrixfälle liefern exakt das erwartete Ergebnis.
-- [ ] Ein Legacy-Sheet ohne Sichtbarkeitsflags liefert auch bei wahrem Legacy-Master keine Details.
-- [ ] Interner `title` erscheint unter keinen Umständen als Fallback.
-- [ ] LF, Umlaute und ß bleiben in freigegebenem Text erhalten.
-- [ ] Boolesches `false` bleibt beim Zeilenaufbau ein Boolean.
-- [ ] API bleibt vor der Migration mit exakten Version-1.2-Headers lesend und für neue Requests schreibend kompatibel.
-
-Tests:
-
-- [ ] In `tests/apps-script.test.js` die generierte `Code.gs` mit `node:vm` und kleinen Apps-Script-Mocks laden.
-- [ ] Testtrailer im VM-Quelltext verwenden, um lexikalische Funktionen gezielt als Testobjekt verfügbar zu machen; keine Testexports in die Produktionsdatei schreiben.
-- [ ] Master-Presence-Matrix vollständig testen.
-- [ ] Beide Detailfelder unabhängig testen.
-- [ ] `false`-Erhalt in `appendRow()` mit einem gemockten Sheet und aufgezeichnetem `appendRow` testen.
-- [ ] Private Feldnamen und Geheimmarker in serialisiertem `publicOccupancyRow()`-Ergebnis ausschließen.
-- [ ] Normalisierung für CRLF, CR, LF, NUL, Tab, Umlaute und ß testen.
-
-```pwsh
-python scripts/build-apps-script.py
-node tests/apps-script.test.js
-```
-
-## Phase 2: Sichere und explizite Sheet-Migration implementieren
-
-Primärdatei: `apps-script/buchungs-api/Code.template.gs`.
-
-Öffentlicher manueller Einstieg:
-
-```js
-function migrateSheetsV13() { /* ausschließlich manuell starten */ }
-```
-
-Vorgesehene private Helper:
-
-- `preflightAllSpreadsheetsV13_()`
-- `preflightSpreadsheetV13_(buildingId)`
-- `readAndClassifyHeaders_(sheet, sheetName)`
-- `assertExactHeaders_(actual, allowed, context)`
-- `assertNoDuplicateSettings_(sheet, buildingId)`
-- `assertNoFormulasInMigrationRange_(sheet, width)`
-- `backupSheetV13_(sheet, timestamp)`
-- `migrateRowsByHeaderV13_(sheet, sourceHeaders, targetHeaders)`
-- `migratePublicDetailsSettingV13_(buildingId)`
-- `applySheetFormattingV13_(sheetName, sheet)`
-- `logMigrationResultV13_(buildingId, message)`
-
-Die Namen dürfen nur geändert werden, wenn die gleiche Trennung und eindeutige Verantwortung erhalten bleibt.
-
-Preflight-Regeln:
-
-- [ ] Zu Beginn `LockService.getScriptLock().waitLock(...)` beziehen und in `finally` freigeben.
-- [ ] Unter demselben Lock zuerst beide Gebäude und alle relevanten Tabs prüfen, bevor ein Backup oder Schreibzugriff erfolgt.
-- [ ] Fehlende Tabs als Fehler behandeln, wenn das Spreadsheet bereits produktive Daten enthält. Neue Installationen werden über `setupSheets()` angelegt, nicht über die Migration erraten.
-- [ ] Für `Bookings` und `Requests` nur exaktes Legacy- oder Zielschema akzeptieren.
-- [ ] Für `Buildings`, `Settings`, `Log` und `Contacts` nur das unveränderte exakte Schema akzeptieren.
-- [ ] Kopfzeilen anhand aller belegten Headerzellen lesen. Doppelte, leere, fehlende oder unbekannte Header sowie falsche Reihenfolge abbrechen.
-- [ ] Im `Settings`-Tab jede doppelte nicht leere Kombination aus `building_id` und `key` abbrechen. Damit sind insbesondere doppelte neue und Legacy-Master ausgeschlossen.
-- [ ] Bei teilweise befüllten Settings-Zeilen ohne `building_id` oder `key` mit klarer deutscher Fehlermeldung abbrechen.
-- [ ] Formeln mit `getFormulas()` blockweise in allen Datenzeilen und allen umzuschreibenden Spalten von Legacy-Bookings/Requests erkennen.
-- [ ] Wenn der neue Settings-Key ergänzt werden muss, Formeln im genutzten Settings-Datenbereich ebenfalls erkennen und abbrechen.
-- [ ] Headerformeln ebenfalls ablehnen.
-- [ ] Fehlertext muss Gebäude-ID, Tabname und Problem nennen, zum Beispiel: `Migration abgebrochen: dgh_rb / Bookings enthält eine Formel in Zeile 7, Spalte internal_note.`
-- [ ] Der Preflight gibt einen unveränderlichen Ausführungsplan zurück: pro Gebäude Schemaart, nötige Backups, nötige Umschreibungen, Settingaktion und Validierungsreparaturen.
-
-Backup-Regeln:
-
-- [ ] Einen gemeinsamen UTC-Zeitstempel pro Lauf im Format `yyyyMMdd_HHmmss` bilden.
-- [ ] Nur Tabs sichern, deren Daten oder Settings in diesem Lauf geändert werden.
-- [ ] Beim normalen Upgrade von 1.2 dadurch `Bookings`, `Requests` und `Settings` je Gebäude sichern.
-- [ ] Backupnamen `Bookings_backup_v13_<Zeitstempel>`, `Requests_backup_v13_<Zeitstempel>` und `Settings_backup_v13_<Zeitstempel>` verwenden.
-- [ ] Vorhandene gleichnamige Backups nicht überschreiben; mit klarer Fehlermeldung abbrechen.
-- [ ] Sicherung innerhalb desselben Spreadsheets konkret mit `sheet.copyTo(spreadsheet)` anlegen, unmittelbar auf den berechneten Backupnamen umbenennen und dadurch Werte, Formate und Datenvalidierungen erhalten. Das blockweise Lesen/Schreiben gilt für die anschließende Datenumschreibung, nicht für diese native vollständige Sheet-Kopie.
-- [ ] Ein Tab mit bereits exaktem Zielschema wird nicht allein wegen Validierungsreparaturen gesichert oder umgeschrieben.
-
-Umschreibungsregeln:
-
-- [ ] Daten in Blöcken zu höchstens 500 Zeilen lesen.
-- [ ] Jede Quellzeile zuerst in ein Objekt `header -> Originalwert` umwandeln.
-- [ ] Zielzeile ausschließlich durch `targetHeaders.map(...)` bilden.
-- [ ] Bestehendes `internal_note` werttreu übernehmen.
-- [ ] Neue `public_title_visible`- und `public_organizer_visible`-Zellen für Legacy-Zeilen als echte Booleans `false` setzen.
-- [ ] Neues `public_organizer` und neues `Requests.internal_note` für Legacy-Zeilen leer setzen.
-- [ ] Keine `note`-Werte nach `internal_note` kopieren.
-- [ ] Zielheader und Zielzeilen in Blöcken schreiben; keine Zelle-für-Zelle-Schleife verwenden.
-- [ ] Nur den tatsächlich betroffenen Quell-/Zielbereich leeren und neu schreiben. Keine fremden Tabs oder Spalten außerhalb des validierten Schemas verändern.
-- [ ] Nach dem Schreiben `SpreadsheetApp.flush()` ausführen und Header sowie Zeilenanzahl erneut lesen und prüfen.
-
-Format- und Validierungsregeln:
-
-- [ ] Zeile 1 einfrieren und bestehendes Headerformat konsistent fortführen.
-- [ ] `date` als `yyyy-mm-dd`, `from`/`to` als `hh:mm` formatieren, ohne zugrunde liegende Werte in Anzeige-Strings umzuwandeln.
-- [ ] `public_title`, `public_organizer`, `note` und `internal_note` auf Zeilenumbruch/Wrap setzen.
-- [ ] Für beide Sichtbarkeitsspalten Checkbox-Datenvalidierung setzen.
-- [ ] Leere oder ungültige Sichtbarkeitswerte in migrierten Legacy-Zeilen auf Boolean `false` setzen; vorhandene echte Zielwerte `true`/`false` beibehalten.
-- [ ] Checkboxvalidierung auf bestehende Datenzeilen und einen dokumentierten Eingabebereich unterhalb der letzten Zeile anwenden.
-- [ ] Bei einem bereits exakten Zielschema ausschließlich fehlende Checkboxvalidierungen und Formatierungen reparieren; Werte nicht neu schreiben.
-
-Settingmigration:
-
-- [ ] Existiert `public_show_booking_details`, dessen Wert unverändert erhalten. Auch leer bleibt leer und damit false.
-- [ ] Fehlt der neue Key und existiert `public_show_booking_titles`, dessen Wert unverändert in eine neue Zeile mit Key `public_show_booking_details` übernehmen.
-- [ ] Fehlen beide Keys, den neuen Key mit echtem Boolean `false` anlegen.
-- [ ] `public_show_booking_titles` nicht löschen oder umbenennen.
-- [ ] Settingzeile über tatsächliche Header schreiben und `false` nicht in `""` verwandeln.
-
-Protokollierung und Idempotenz:
-
-- [ ] Nach erfolgreicher Migration pro Gebäude einen knappen Eintrag im vorhandenen `Log`-Tab mit Action `migrateSheetsV13` schreiben.
-- [ ] Zusätzlich `console.log` mit Gebäude, alten/neuen Schemaarten, Zeilenzahlen und Backupnamen verwenden.
-- [ ] Zweiter Lauf bei Zielschemas und vorhandenem neuen Setting erzeugt keine neuen Backups und schreibt keine Datenzeilen neu.
-- [ ] Zweiter Lauf darf fehlende Validierungen reparieren und muss dies protokollieren.
-- [ ] Bei Fehler nach Beginn der Änderungen abbrechen, Lock freigeben und konkrete Wiederherstellung aus Backup nennen. Keine automatische scheinbare Gesamt-Rückabwicklung über beide Sheets versuchen.
-
-`setupSheets()` gleichzeitig härten:
-
-- [ ] Zuerst beide Spreadsheets und alle vorhandenen Tabs validieren, erst danach fehlende leere Tabs anlegen.
-- [ ] Fehlende Tabs mit Zielschema anlegen.
-- [ ] Bei `getLastRow() === 0` Zielheader schreiben.
-- [ ] Bei bestehender Headerzeile nur exaktes Legacy- oder Zielschema akzeptieren; gefüllte Legacy-Tabs nicht migrieren.
-- [ ] Bestehende gefüllte Header nie blind überschreiben.
-- [ ] Startsetting ist `public_show_booking_details` aus `publicShowBookingDetails`.
-- [ ] Setup darf den Legacy-Key nicht löschen.
-- [ ] Formatierungen und Checkboxvalidierungen bei neuen Ziel-Tabs anwenden.
-
-Akzeptanzkriterien:
-
-- [ ] Gesamt-Preflight beider Gebäude läuft vor der ersten Änderung.
-- [ ] Ein unbekannter Header in nur einem Gebäude verhindert jede Änderung in beiden Gebäuden.
-- [ ] Eine Formel im betroffenen Datenbereich verhindert jede Änderung.
-- [ ] Normaler 1.2-Lauf erzeugt Sicherungstabs, erhält Werte und erreicht exakt beide Zielschemas.
-- [ ] `internal_note` landet werttreu am Ende.
-- [ ] Alle neuen Flags sind echte Checkbox-Booleans und initial `false`.
-- [ ] Zweiter Lauf ist datenseitig idempotent.
-- [ ] Kein Text verspricht eine atomare Migration über beide Spreadsheets.
-
-Tests:
-
-- [ ] Pure Headerklassifikation, Header-Mapping, Settingentscheidung und Idempotenzplan in `tests/apps-script.test.js` testen.
-- [ ] Google-spezifische Sicherung, Formate, Checkboxen, Lock und `flush()` zusätzlich manuell in Kopien beider Sheets testen.
-- [ ] Einen Staging-Test mit absichtlich doppeltem Header, doppeltem Setting und einer Formel durchführen und jeweiligen Abbruch bestätigen.
-
-## Phase 3: Gebundenes Verwaltungsskript an Zielschemas anpassen
-
-Datei: `apps-script/buchungsverwaltung/Code.gs`.
-
-Zu ändernde Symbole:
-
-- `approveSelectedRequest()`
-- `confirmBlock(data)`
-- `appendRow_(sheetName, data)`
-- `formatCell_(value, header)`
-- `showHelp()`
-- neue Headerprüfungen, zum Beispiel `assertRequiredHeaders_(sheetName, requiredHeaders)`
-
-Genaue Änderungen:
-
-- [ ] Konstanten mit den zwingend benötigten Headern für `Bookings`, `Requests`, `Buildings`, `Settings` und `Log` ergänzen.
-- [ ] `approveSelectedRequest()` vor dem Lesen/Schreiben prüfen lassen, dass Requests und Bookings alle Zielheader besitzen.
-- [ ] Fehler in klarer deutscher Form ausgeben, zum Beispiel: `Tab "Bookings" hat nicht das Schema von Version 1.3. Fehlende Spalten: public_organizer, public_organizer_visible.`
-- [ ] Bestätigte Anfrage mit `public_title: ""`, `public_title_visible: false`, `public_organizer: ""`, `public_organizer_visible: false` anlegen.
-- [ ] `internal_note: data.internal_note || ""` verwenden; `data.note` ausdrücklich nicht verwenden.
-- [ ] `confirmBlock()` mit denselben leeren öffentlichen Feldern und echten false-Flags schreiben.
-- [ ] Sperrdialogfeld `note` bleibt Dialogname, wird aber ausschließlich als `Bookings.internal_note` gespeichert.
-- [ ] `appendRow_()` weiterhin tatsächliche Header verwenden lassen.
-- [ ] `data[h] || ''` in `appendRow_()` durch Null/Undefined-Prüfung ersetzen.
-- [ ] `formatCell_()` Boolean erhalten lassen.
-- [ ] `updateRow_()` bei fehlendem angefordertem Header nicht still ignorieren, sondern einen klaren Fehler werfen.
-- [ ] Nach schreibenden Aktionen `SpreadsheetApp.flush()` vor Erfolgsmeldung aufrufen.
-- [ ] `showHelp()` ergänzen: `public_title`, `public_organizer` und die beiden Checkboxen werden direkt im `Bookings`-Tab gepflegt; Text allein veröffentlicht nichts; Master im Settings-Tab ist zusätzlich erforderlich.
-- [ ] Hilfetext klarstellen, dass Personennamen oder `mailto:` nur nach bewusster Freigabe öffentlich werden.
-
-Akzeptanzkriterien:
-
-- [ ] Bestätigung kopiert nur `Requests.internal_note` in `Bookings.internal_note`.
-- [ ] Antragstellertext in `Requests.note` bleibt unverändert und privat.
-- [ ] Neue bestätigte Buchung und neue Sperrung sind fail closed.
-- [ ] Falsches Schema führt vor Änderung zu einer verständlichen Meldung.
-- [ ] Boolean `false` bleibt beim `appendRow_()` erhalten.
-
-Tests:
-
-- [ ] Verwaltungsskript-Pure-Helper soweit möglich in `tests/apps-script.test.js` mit VM-Mocks testen.
-- [ ] Bestätigen, Ablehnen und Sperren in je einer Sheet-Kopie manuell testen.
-- [ ] Prüfen, dass die Bestätigungs-E-Mail weiterhin den internen Anfragetitel nutzt, aber keine neuen öffentlichen Felder automatisch setzt.
-
-## Phase 4: Eingeschränkten Markdownrenderer implementieren
-
-Neue Datei: `assets/js/restricted-markdown.js`.
-
-Neue Node-Prüfung: `tests/restricted-markdown.test.js`.
-
-Öffentliche API des Moduls:
-
-```js
-RestrictedMarkdown.parse(value)
-RestrictedMarkdown.render(target, value, options)
-RestrictedMarkdown.isAllowedLink(rawUrl)
-```
-
-`parse()` liefert eine einfache, serialisierbare Struktur für Node-Tests. `render()` nimmt ein vorhandenes DOM-Ziel, leert es mit `replaceChildren()` und baut ausschließlich erlaubte Knoten mit `ownerDocument.createElement()` und `createTextNode()`.
-
-Erlaubte Syntax:
-
-- Absätze durch mindestens eine Leerzeile.
-- Einzelne Zeilenumbrüche als `<br>`.
-- `**fett**` als `<strong>`.
-- `*kursiv*` als `<em>`.
-- `[Text](https://absolute.example/path)` als externer Link.
-- `[Text](mailto:name@example.org)` als E-Mail-Link.
-
-Verbotene Syntax wird nicht als entsprechendes HTML interpretiert:
-
-- Raw HTML.
-- Bilder `![Alt](...)`.
-- Überschriften.
-- Listen.
-- Tabellen.
-- Inline- und Block-Code.
-- `http:`.
-- `javascript:`.
-- `data:`.
-- `vbscript:`.
-- Relative URLs.
-- Protokollrelative URLs.
-
-Parser- und Rendererregeln:
-
-- [ ] Keine Regex verwenden, die aus einem kompletten Link direkt HTML zusammensetzt.
-- [ ] Markdown zeichenweise oder über klar begrenzte Token parsen.
-- [ ] Linkziel mit `new URL(rawUrl)` ohne Basis-URL parsen. Dadurch bleiben relative und protokollrelative Ziele ungültig.
-- [ ] Nur `url.protocol === "https:"` oder `url.protocol === "mailto:"` akzeptieren.
-- [ ] HTTPS erfordert einen nicht leeren Host und darf keine eingebetteten Zugangsdaten enthalten.
-- [ ] `mailto:` erfordert einen nicht leeren Empfänger und darf keine Leer- oder Steuerzeichen enthalten.
-- [ ] Bei vollständig erkannter, aber abgelehnter Linksyntax nur den sichtbaren Linktext als normalen Text ausgeben; keinen `<a>`-Knoten erzeugen.
-- [ ] Bei fehlerhafter, nicht vollständig erkannter Markdownsyntax die Eingabezeichen als Text erhalten.
-- [ ] Bildsyntax vollständig als Text behandeln und nicht den darin enthaltenen `[Alt](...)`-Teil versehentlich als Link rendern.
-- [ ] Raw HTML ausschließlich als Textknoten ausgeben.
-- [ ] Erlaubte Element-Whitelist auf `p`, `br`, `strong`, `em`, `a` und `span` für den Screenreader-Hinweis begrenzen.
-- [ ] Keine Eventattribute und kein `style` aus Eingaben übernehmen.
-- [ ] HTTPS-Links erhalten `target="_blank"` und `rel="noopener noreferrer"`.
-- [ ] Nach HTTPS-Links einen visuell versteckten Hinweis „öffnet in einem neuen Tab“ einfügen und diesen für Screenreader verfügbar lassen.
-- [ ] `mailto:`-Links erhalten kein `target` und keinen Neuer-Tab-Hinweis.
-- [ ] CSS-Klasse `.visually-hidden` in `assets/css/app.css` ergänzen.
-- [ ] Kombinationen aus Hervorhebung und Text sicher verarbeiten. Verschachtelte oder mehrdeutige Konstrukte dürfen konservativ als Text erscheinen; Sicherheit hat Vorrang vor vollständiger Markdown-Kompatibilität.
-- [ ] News/About-Funktion `markdown()` in `assets/js/ui.js` unverändert lassen.
-
-Akzeptanzkriterien:
-
-- [ ] Renderer funktioniert als Browsermodul und `parse()`/URL-Prüfung funktionieren per CommonJS in Node.
-- [ ] Es gibt keine Stelle, an der Buchungs-Markdown in `innerHTML` gelangt.
-- [ ] Erlaubte Links funktionieren mit korrekten Attributen.
-- [ ] Abgelehnte Links sind nicht klickbar.
-- [ ] XSS-Payloads erzeugen nur Text, keine ausführbaren Elemente oder Attribute.
-- [ ] LF, Umlaute und ß bleiben sichtbar korrekt.
-
-Pflichttests in `tests/restricted-markdown.test.js`:
-
-- [ ] Absätze und einzelne LF.
-- [ ] `**fett**` und `*kursiv*`.
-- [ ] Absolute HTTPS-URL mit Query und Fragment.
-- [ ] `mailto:`.
-- [ ] `http:`, `javascript:`, gemischt geschriebene gefährliche Protokolle, `data:` und `vbscript:`.
-- [ ] Relative und protokollrelative URL.
-- [ ] `<script>`, `<img onerror>`, SVG- und Attribut-Payloads.
-- [ ] Bildsyntax.
-- [ ] Überschrift, Liste, Tabelle und Code bleiben nicht-semantischer Text.
-- [ ] Fehlende Klammern, ungepaarte Sternchen und leeres Linkziel.
-- [ ] Umlaute und ß.
-
-```pwsh
-node tests/restricted-markdown.test.js
-```
-
-## Phase 5: Frontend-Kernlogik und 24-Stunden-Cache implementieren
-
-Neue Datei: `assets/js/frontend-core.js`.
-
-Zu ändernde Datei: `assets/js/app.js`.
-
-Neue Prüfung: `tests/frontend-core.test.js`.
-
-Öffentliche Kernfunktionen:
-
-```js
-FrontendCore.OCCUPANCY_CACHE_TTL_MS
-FrontendCore.occupancyCacheKey(buildingId, from, to)
-FrontendCore.createOccupancyCacheRecord(payload, now)
-FrontendCore.parseOccupancyCacheRecord(raw, now)
-FrontendCore.sortOccupancyItems(items)
-FrontendCore.dayStatus(items)
-```
-
-Cacheformat:
-
-```json
-{
-  "cachedAt": 1784024100000,
-  "payload": {
-    "schemaVersion": 2,
-    "loadedAt": "2026-07-14T10:15:00.000Z",
-    "items": []
-  }
-}
-```
-
-Genaue Änderungen:
-
-- [ ] Cachekey exakt als `occupancy:v2:<buildingId>:<from>:<to>` bilden.
-- [ ] `OCCUPANCY_CACHE_TTL_MS` exakt auf `24 * 60 * 60 * 1000` setzen.
-- [ ] `createOccupancyCacheRecord()` setzt `cachedAt` auf den übergebenen Testzeitpunkt oder `Date.now()` und enthält den vollständigen Payload einschließlich öffentlicher Details.
-- [ ] `parseOccupancyCacheRecord()` kapselt `JSON.parse` nicht selbst als ungefangene Ausnahme, sondern liefert einen Ergebniszustand wie `fresh`, `expired` oder `invalid`.
-- [ ] Record nur akzeptieren, wenn `cachedAt` endlich/numerisch, nicht zukünftig, Payload ein Objekt und `payload.items` ein Array ist.
-- [ ] Bei Alter `< TTL` `fresh`, bei Alter `>= TTL` `expired` liefern.
-- [ ] In `app.js` kleine Storage-Wrapper `readOccupancyCache(range)`, `writeOccupancyCache(range, payload)` und `removeOccupancyCache(range)` ergänzen.
-- [ ] Jeden Storagezugriff separat mit `try/catch` schützen.
-- [ ] Bei `invalid` oder `expired` den v2-Key fehlergeschützt entfernen und nichts anzeigen.
-- [ ] Den alten exakten Key `occupancy:<buildingId>:<from>:<to>` beim Laden dieses Bereichs fehlergeschützt entfernen; alten Inhalt nie lesen.
-- [ ] Quota-Fehler beim Schreiben ignorieren, nachdem die frische Netzwerkantwort normal gerendert wurde.
-- [ ] `currentOccupancyPayload`/`currentOccupancyRange` zu einem eindeutigen Zustand erweitern oder um `currentOccupancyStale` ergänzen.
-- [ ] `renderOccupancy()` den gespeicherten stale-Wert weiterreichen lassen, statt `false` fest einzutragen.
-- [ ] Bei erfolgreichem Netzabruf `stale: false` setzen und vollständigen Payload cachen.
-- [ ] Bei Netzfehler nur einen gültigen Cache unter 24 Stunden verwenden und `stale: true` setzen.
-- [ ] Ansichtswechsel muss denselben Zustand mit `stale: true` weiter rendern.
-- [ ] Tagesdialog muss seine Einträge aus demselben aktuellen Zustand beziehen, damit öffentliche Details im Offlinefall erhalten bleiben.
-- [ ] Abgelaufenen Cache nicht als leere Belegung interpretieren; stattdessen vorhandene Ladefehlermeldung anzeigen.
-- [ ] `loadedAt` ausschließlich für den sichtbaren Datenstand verwenden, nie zur TTL-Berechnung.
-- [ ] `bookingItems()` weiterhin `requested` herausfiltern; defensiv sortierte API-Items verwenden.
-
-Akzeptanzkriterien:
-
-- [ ] 23:59:59.999 Stunden alter Cache ist nutzbar.
-- [ ] Exakt 24:00:00.000 Stunden alter Cache wird gelöscht und nicht angezeigt.
-- [ ] Kaputtes JSON, blockierter Storage und Quota-Fehler brechen die App nicht.
-- [ ] Beide Gebäude und Bereiche besitzen getrennte Keys.
-- [ ] Öffentliche Detailtexte bleiben bei gültigem Offlinefallback, Ansichtswechsel und geöffnetem Dialog erhalten.
-- [ ] Stale-Anzeige bleibt nach Ansichtswechsel sichtbar.
-
-Pflichttests in `tests/frontend-core.test.js`:
-
-- [ ] Exakter Key für beide Gebäude.
-- [ ] Zwei Datumsbereiche kollidieren nicht.
-- [ ] 23:59 gültig und 24:00 ungültig.
-- [ ] Zukunftszeitpunkt ungültig.
-- [ ] Kaputtes JSON und falsche Recordtypen.
-- [ ] Payload mit öffentlichen Details bleibt vollständig erhalten.
-- [ ] Storage-Wrapper mit get/set/remove-Ausnahmen über testbare Adapter oder VM-Kontext.
-- [ ] Sortierung mehrerer Einträge nach Datum, `from`, `to` und stabiler ursprünglicher Reihenfolge bei Gleichstand.
-- [ ] Tagesstatuspriorität `blocked`, `busy`, `partial`, `free`.
-
-```pwsh
-node tests/frontend-core.test.js
-```
-
-## Phase 6: Gemeinsamen Detailrenderer, Liste und Dialog implementieren
-
-Dateien:
-
-- `index.html`
-- `assets/js/ui.js`
-- `assets/js/app.js`
-- `assets/css/app.css`
-- `betreiber/allgemein/texte/frontend.json`
-
-Neue oder geänderte UI-Symbole:
-
-- `renderBookingDetails(target, item)`
-- `createBookingDetailsElement(item)` oder ein gleichwertiger DOM-Helper
-- `renderOccupancy(items, loadedAt, stale)`
-- `renderOccupancyPlan(items, loadedAt, stale, range)`
-- `itemStatus(item)` und `dayStatus(items)` oder Verwendung der gleichnamigen Funktionen aus `FrontendCore`
-- `renderMonth(month, itemsByDate, range)`
-- neue Funktion `openBookingDetailsDialog(date, trigger)`
-- neue Funktion `close`-Fokusrückgabe für den Dialog
-
-Texte in `frontend.json` ergänzen oder ändern:
-
-- [ ] `viewTable`: `Liste`.
-- [ ] `showAsTable`: `als Liste anzeigen`.
-- [ ] Label `Veranstaltung`.
-- [ ] Label `Veranstalter`.
-- [ ] Dialogtitel/-hinweis für Tagesdetails.
-- [ ] Text `Details öffnen` für vollständige Aria-Labels.
-- [ ] Status `gesperrt`.
-- [ ] Legendentext `gesperrt`.
-- [ ] Schließen-Text.
-- [ ] Screenreader-Hinweis `öffnet in einem neuen Tab`.
-- [ ] Datenschutz-/Cachehinweis in verständlichem Deutsch, wo die öffentliche Belegung erklärt wird.
-
-Statischer Dialog in `index.html`:
-
-- [ ] Genau ein natives `<dialog id="bookingDetailsDialog">` einfügen.
-- [ ] Dialog mit `aria-labelledby` an eine dynamisch befüllte Überschrift binden.
-- [ ] Einen statischen Inhaltscontainer für chronologisch sortierte Tageseinträge vorsehen.
-- [ ] Schließen-Button in `<form method="dialog">` setzen.
-- [ ] Keine `role="dialog"`-Doppelung hinzufügen; `<dialog>` liefert die Semantik.
-- [ ] `Escape` nativ schließen lassen.
-- [ ] Beim `close`-Event Fokus explizit auf den gespeicherten Trigger zurückgeben.
-- [ ] Wenn der Trigger nach einem Rerender nicht mehr verbunden ist, Fokus auf `#occupancyView`, ersatzweise auf die Überschrift des Belegungsabschnitts setzen.
-- [ ] Neue Scripts vor `ui.js`/`app.js` laden.
-
-Gemeinsamer Detailrenderer:
-
-- [ ] `renderBookingDetails(target, item)` erzeugt Datum-Label, Zeit, Statusbadge und optionale Detailblöcke.
-- [ ] Datum-Label als wiedererkennbares eckiges Designelement in Primärfarbe gestalten.
-- [ ] Zeit als „Ganzer Tag“ oder „HH:MM bis HH:MM Uhr“ ausgeben.
-- [ ] Statusbadge anhand `statusKey` ausgeben; `blocked` rot.
-- [ ] `publicTitle` nur bei nicht leerem String als gelabelten Block „Veranstaltung“ rendern.
-- [ ] `publicOrganizer` nur bei nicht leerem String als gelabelten Block „Veranstalter“ rendern.
-- [ ] Leere öffentliche Felder vollständig weglassen; keine Gedankenstriche oder Platzhalter.
-- [ ] Beide Textwerte ausschließlich mit `RestrictedMarkdown.render()` rendern.
-- [ ] Listenkarte und jeder Dialogeintrag rufen exakt diese Funktion auf.
-- [ ] Liste defensiv chronologisch sortieren.
-- [ ] Dialogeinträge eines Tages nach `from`, dann `to`, dann stabiler Eingangsreihenfolge sortieren.
-
-Kalenderinteraktion:
-
-- [ ] Freier Tag bleibt nativer Button mit `data-booking-date` und startet weiterhin das Anfrageformular.
-- [ ] Jeder `partial`-, `busy`- oder `blocked`-Tag wird nativer Button mit `data-occupancy-date`.
-- [ ] Nicht freie Tagesbuttons erhalten `aria-haspopup="dialog"` und `aria-controls="bookingDetailsDialog"`.
-- [ ] Vollständiges `aria-label` enthält formatiertes Datum, Status und Aktion „Details öffnen“.
-- [ ] Nicht freie Tagesbuttons erhalten kein `data-booking-date`, damit sie nicht versehentlich das Anfrageformular vorbefüllen.
-- [ ] Kalenderzellen bleiben visuell kompakt und zeigen ausschließlich Tageszahl und Statusfarbe; Veranstaltung und Veranstalter erscheinen nur in Liste und Dialog.
-- [ ] Klickdelegation in `app.js` unterscheidet zuerst Dialogtrigger und freie Buchungstrigger eindeutig.
-- [ ] Enter und Leertaste über natives Buttonverhalten testen; keine `role="button"`-Nachbildung.
-- [ ] Keine `role="grid"`, `role="row"` oder `role="gridcell"` hinzufügen.
-- [ ] Monatstitel in eine echte Überschrift, beispielsweise `<h3>`, setzen. Die vorhandene Aktion zum Wechsel in die Monatsliste darf als Button innerhalb der Überschrift erhalten bleiben.
-
-Statuslogik:
-
-- [ ] Enthält der Tag einen ganztägigen `blocked`-Eintrag, Status `blocked` und rote Zelle.
-- [ ] Sonst enthält der Tag einen ganztägigen `confirmed`-Eintrag, Status `busy` und Primärfarbe.
-- [ ] Sonst enthält der Tag mindestens einen Eintrag, Status `partial` und bestehender diagonaler Verlauf.
-- [ ] Sonst Status `free`.
-- [ ] Bei mehreren Einträgen hat ganztägiges `blocked` Vorrang vor ganztägigem `confirmed`.
-- [ ] Zeitweise `blocked` bleibt Kalenderstatus `partial`, zeigt im Detail aber rotes Badge.
-- [ ] Legende um rote Kategorie `gesperrt` ergänzen.
-
-Accessibility und Statusausgabe:
-
-- [ ] `aria-live="polite"` von `#occupancyList` entfernen.
-- [ ] `#occupancyMeta` mit `role="status"` und `aria-atomic="true"` versehen.
-- [ ] Eigene CSS-Regel für `#occupancyMeta` oder `.occupancy-meta` mit kontrastreicher Textfarbe auf Panelhintergrund ergänzen.
-- [ ] Statusupdates knapp halten, damit nicht die gesamte Liste vorgelesen wird.
-- [ ] Sichtbaren Fokus für alle Tagesbuttons und Dialogsteuerungen beibehalten.
-- [ ] Dialog nach `showModal()` sinnvoll fokussieren; nativer Autofokus auf Schließen-Button oder Dialogüberschrift mit `tabindex="-1"` ist festzulegen und zu testen.
-
-Responsive CSS:
-
-- [ ] Tagesziele standardmäßig mindestens 44 × 44 CSS-Pixel groß machen.
-- [ ] Auf kleinen Breiten Panel- und Kalenderpadding reduzieren, nicht die Interaktionsziele unter 44 px verkleinern.
-- [ ] Kalendergrid mit `minmax(0, 1fr)` und begrenzten Gaps ohne horizontalen Overflow halten.
-- [ ] Dialog eckig, Open Sans, bestehende Variablen/Farben und `max-width` relativ zum Viewport verwenden.
-- [ ] Dialoghöhe begrenzen und inneren Inhaltsbereich mit `overflow-y: auto` scrollbar machen.
-- [ ] `dialog::backdrop` zurückhaltend gestalten.
-- [ ] Kein generisches Redesign anderer Sektionen durchführen.
-- [ ] Lange URLs, Veranstalternamen und Markdowntext mit `overflow-wrap: anywhere` abfangen.
-
-Akzeptanzkriterien:
-
-- [ ] Liste zeigt Datum, Zeit, Status und nur vorhandene gelabelte Details.
-- [ ] Dialog zeigt alle Tageseinträge chronologisch mit identischen Detailtexten zur Liste.
-- [ ] Belegte, teilbelegte und gesperrte Tage sind native Dialogbuttons.
-- [ ] Freie Tage starten unverändert die Anfrage.
-- [ ] Klick, Enter, Leertaste, Escape und Fokusrückgabe funktionieren.
-- [ ] Monatsname ist semantische Überschrift.
-- [ ] Bei 390 px Viewportbreite existiert kein horizontaler Overflow.
-- [ ] DGH- und Gemeindehausfarben bleiben erhalten.
-
-Tests:
-
-- [ ] Pure Status-/Sortierfälle in `tests/frontend-core.test.js`.
-- [ ] DOM-, Keyboard-, Dialog- und Responsive-Fälle in `tests/browser.test.py`.
-- [ ] Bestehende News/About-Ausgabe regressiv im Browser prüfen.
-
-## Phase 7: Browser-End-to-End-Test ohne Produktionssecret
-
-Neue Datei: `tests/browser.test.py`.
-
-Testaufbau:
-
-- [ ] `_site` muss vor Teststart durch `python scripts/build-pages-site.py` erzeugt sein.
-- [ ] Im Test einen lokalen `ThreadingHTTPServer` auf einem freien Loopback-Port starten und im `finally` sicher beenden.
-- [ ] Playwright Chromium headless verwenden.
-- [ ] Service Worker im Testkontext blockieren, damit alte lokale Worker den Test nicht beeinflussen.
-- [ ] `config/config.js` per Playwright-Route nur im Test mit einer syntaktisch gültigen Test-`/exec`-URL ausliefern; Repositoryquelle nicht mit Secret oder Test-URL überschreiben.
-- [ ] Apps-Script-GET-Antworten per `page.route()` erfüllen.
-- [ ] Unterschiedliche Mockantworten für `dgh_rb` und `ev_gem_rb` verwenden.
-- [ ] Keine Anfrage an die echte `script.google.com`-Produktion durchlassen.
-- [ ] Console-Errors und ungefangene Page-Errors sammeln und am Testende als Fehler behandeln.
-
-Pflichtfälle:
-
-- [ ] Mehrere Einträge eines Tages werden chronologisch angezeigt.
-- [ ] Listen- und Dialogdarstellung enthalten für denselben Eintrag identische Veranstaltung-/Veranstaltertexte.
-- [ ] Leere Details erzeugen keine Labels und keine Platzhalter.
-- [ ] Ganztägige Sperrung erzeugt rote Kalenderzelle und rotes Badge.
-- [ ] Zeitweise Sperrung erzeugt partial-Zelle und rotes Badge im Dialog.
-- [ ] Belegter Tag öffnet per Klick.
-- [ ] Belegter Tag öffnet bei fokussiertem Button per Enter.
-- [ ] Belegter Tag öffnet bei fokussiertem Button per Leertaste.
-- [ ] Escape schließt und Fokus kehrt zum Trigger zurück.
-- [ ] Schließen-Button mit `form method="dialog"` schließt und Fokus kehrt zurück.
-- [ ] Freier Tag füllt weiterhin das Anfrageformular vor.
-- [ ] `#occupancyList` besitzt kein `aria-live`.
-- [ ] `#occupancyMeta` besitzt `role="status"` und `aria-atomic="true"`.
-- [ ] Monatsname ist als Überschrift erkennbar.
-- [ ] Bei 390 px Breite gilt `document.documentElement.scrollWidth <= document.documentElement.clientWidth`.
-- [ ] HTTPS-Link hat `_blank`, `noopener noreferrer` und Screenreader-Hinweis.
-- [ ] `mailto:` öffnet keinen neuen Tab.
-- [ ] XSS-Teststrings erzeugen keine `script`, `img`, `svg` oder Eventhandler im Buchungsdetail.
-- [ ] DGH- und Gemeindehaus-Mockdaten bleiben in ihren Scopes isoliert.
-- [ ] Offlinefallback unter 24 Stunden zeigt stale samt Details; Ansichtswechsel erhält stale.
-- [ ] Abgelaufener Cache zeigt keine alten Details.
-
-Lokale Installation:
-
-```pwsh
-python -m pip install playwright==1.61.0
-python -m playwright install chromium
-```
-
-Test:
-
-```pwsh
-python tests/browser.test.py
-```
-
-CI-Installation:
-
-```bash
-python -m pip install playwright==1.61.0
-python -m playwright install --with-deps chromium
-```
-
-## Phase 8: Betreibertexte, Datenschutz und Konfiguration korrigieren
-
-Dateien:
-
-- `betreiber/allgemein/texte/frontend.json`
-- `betreiber/DGH/texte/about.md`
-- `betreiber/EV_GEMEINDEHAUS/texte/about.md`
-- `betreiber/allgemein/texte/rechtliches.md`
-- `betreiber/allgemein/konfiguration/frontend.json`
-- `betreiber/allgemein/backend/konfiguration.json`
-
-Genaue Änderungen:
-
-- [ ] In beiden About-Dateien die Aussage „nur belegt“ ersetzen: Öffentlich erscheinen Datum, Zeit und Status sowie ausschließlich vom Betreiber ausdrücklich freigegebene Veranstaltungstitel und Veranstalter.
-- [ ] Klarstellen, dass Namen, Kontaktdaten und Texte aus Buchungsanfragen nicht automatisch veröffentlicht werden.
-- [ ] Klarstellen, dass ein Betreiber bewusst einen Personennamen oder einen `mailto:`-Link als öffentlichen Veranstalter freigeben kann und damit eine öffentliche Veröffentlichung auslöst.
-- [ ] Falsche Aussage zur vollständigen Löschung am Folgetag entfernen.
-- [ ] Stattdessen exakt formulieren: Vergangene Belegungen werden über die öffentliche API nicht angezeigt; interne Aufbewahrung und Löschung erfolgen nach dem Prozess des jeweiligen Betreibers.
-- [ ] Das bewusste Cache-Risiko dokumentieren: Bereits abgerufene freigegebene Details können nach späterer Deaktivierung auf demselben Gerät offline bis zum Ablauf der 24 Stunden sichtbar bleiben.
-- [ ] Den technischen Cachehinweis auch im Datenschutz-/Rechtstext sachlich ergänzen, ohne den vorhandenen Platzhalter für die vollständige Betreiber-Datenschutzerklärung fälschlich als erledigt darzustellen.
-- [ ] `publicShowBookingTitles` vollständig aus `betreiber/allgemein/konfiguration/frontend.json` entfernen. Sicherheitsfreigabe gehört nicht in öffentliche Frontendkonfiguration.
-- [ ] Backend-Property wie in Phase 1 auf `publicShowBookingDetails` umbenennen.
-- [ ] Persistierte Sheet-Settings nicht anhand der JSON-Umbenennung löschen; dafür ist die definierte Settingmigration zuständig.
-- [ ] Alle neuen sichtbaren Texte in korrektem Deutsch mit Umlauten und ß schreiben.
-
-Akzeptanzkriterien:
-
-- [ ] Kein About-Text behauptet mehr, dass ausschließlich „belegt“ gezeigt werde.
-- [ ] Keine Datei behauptet eine täglich vollständig implementierte Löschung.
-- [ ] Automatische Veröffentlichung von Mieter-/Anfragedaten wird ausdrücklich ausgeschlossen.
-- [ ] Bewusst öffentliche Personennamen/`mailto:` und 24-Stunden-Offlinerest sind transparent dokumentiert.
-- [ ] Öffentliche Runtimekonfiguration enthält kein `publicShowBookingTitles` und keinen neuen Sicherheitsmaster.
-
-## Phase 9: Design- und Betriebsdokumentation aktualisieren
-
-Dateien:
-
-- `DESIGN.md`
-- `docs/google-sheet-struktur.md`
-- `docs/apps-script-deployment.md`
-- `apps-script/README.md`
-- `README.md`
-- `PROJEKTUEBERSICHT.md`
-
-`DESIGN.md`:
-
-- [ ] Datenschutzprinzip korrigieren: keine privaten/personenbezogenen Anfragedaten im öffentlichen Cache; bewusst freigegebene öffentliche Details dürfen 24 Stunden gecacht werden.
-- [ ] Detailkarten mit Datum-Label, Zeit, Statusbadge, Veranstaltung und Veranstalter dokumentieren.
-- [ ] Nativen eckigen Dialog, internen Scrollbereich, Fokusführung und Responsive-Regeln dokumentieren.
-- [ ] Rote `blocked`-Legende und Statuspriorität dokumentieren.
-- [ ] Eingeschränkte Markdown-Syntax samt Linkattributen und verbotenen Konstruktionen dokumentieren.
-- [ ] Mindestziel 44 px und kein horizontales Overflow bei 390 px dokumentieren.
-
-`docs/google-sheet-struktur.md`:
-
-- [ ] Beide Zielschemas exakt dokumentieren.
-- [ ] Bedeutung und Privacy aller vier öffentlichen Felder erklären.
-- [ ] `Requests.note` und `Requests.internal_note` deutlich trennen.
-- [ ] `public_show_booking_details` als Master dokumentieren.
-- [ ] Legacy-Fallback und Nicht-Löschung des alten Keys für Version 1.3 dokumentieren.
-- [ ] Checkboxen als echte Booleans, Standard false, erklären.
-- [ ] Zulässiges eingeschränktes Markdown und 1000-Zeichen-Limit dokumentieren.
-- [ ] `migrateSheetsV13()` samt Preflight, Backups, Wartungsfenster und fehlender globaler Atomarität dokumentieren.
-
-`docs/apps-script-deployment.md`:
-
-- [ ] `setupSheets()` nicht mehr als gefahrlosen Headerüberschreiber beschreiben.
-- [ ] Neue Installation und Migration bestehender Sheets getrennt erklären.
-- [ ] Exakte fail-closed Deploymentreihenfolge aus diesem Plan übernehmen.
-- [ ] Neue API-Beispielantwort mit `schemaVersion: 2`, `publicTitle` und `publicOrganizer` ergänzen.
-- [ ] Manuelle Live-Prüfung beider Gebäude und Geheimmarkertest aufnehmen.
-- [ ] Bestehende `/exec`-URL und neue Deploymentversion erklären.
-
-`apps-script/README.md`:
-
-- [ ] API-Aufgaben um Detailsfreigabe und Migration ergänzen.
-- [ ] Template-als-Quelle-Regel hervorheben.
-- [ ] Gebundenes Verwaltungsskript und dessen separate Aktualisierung je Sheet erläutern.
-
-`README.md` und `PROJEKTUEBERSICHT.md`:
-
-- [ ] Version 1.2 auf 1.3 ändern.
-- [ ] Öffentliche Details, fail-closed Freigabe, eingeschränktes Markdown und 24-Stunden-Offlinecache knapp beschreiben.
-- [ ] Testliste um alle neuen Befehle ergänzen.
-- [ ] Datenschutzsatz korrigieren: bewusst freigegebene Titel/Veranstalter können öffentlich sein; private Anfragefelder bleiben im Backend.
-- [ ] `tests/browser.test.py` statt des bisher nur optional erwähnten `tools/test-demo.py` als Pflichtprüfung für dieses Feature nennen; vorhandenes Tool nicht ohne Grund löschen.
-
-Akzeptanzkriterien:
-
-- [ ] Dokumentation und Code verwenden dieselben Header, Keynamen, Cachegrenzen und API-Feldnamen.
-- [ ] Version 1.3 steht in README und Projektübersicht.
-- [ ] Kein Dokument empfiehlt manuelle Änderungen an generiertem `Code.gs` oder `_site`.
-
-## Phase 10: Buildverifikation und CI erweitern
-
-Dateien:
-
-- `.github/workflows/pages.yml`
-- bei Bedarf `scripts/verify-pages-site.py`
-- `tests/content-build.test.py`
-- bestehende `tests/configure-runtime.test.py`
-- bestehende `tests/service-worker.test.js`
-
-CI-Struktur:
-
-- [ ] Trigger `pull_request` ergänzen.
-- [ ] Einen Job `quality` auf `ubuntu-latest` für Push, Pull Request und manuellen Lauf anlegen.
-- [ ] Python und Node 22 wie bisher einrichten.
-- [ ] Playwright exakt in Version 1.61.0 und Chromium mit `--with-deps` installieren.
-- [ ] Im Qualitätsjob alle Build- und Testbefehle aus diesem Plan ausführen.
-- [ ] Deploymentjob nur ausführen, wenn Event kein Pull Request ist und `quality` erfolgreich war.
-- [ ] Deploymentjob darf weiterhin das Secret `APPS_SCRIPT_WEB_APP_URL` ausschließlich zur Runtimekonfiguration von `_site` nutzen.
-- [ ] Pull-Request-Job darf das Secret nicht benötigen.
-- [ ] Vor Upload weiterhin `python scripts/verify-pages-site.py --final-artifact` ausführen.
-
-Buildprüfungen:
-
-- [ ] Sicherstellen, dass `build-pages-site.py` die neuen JS-Dateien unverändert in Root, DGH und Gemeindehaus kopiert. Der bestehende `copytree(ROOT / "assets/js", ...)` sollte bereits genügen; keine Sonderkopie hinzufügen.
-- [ ] Sicherstellen, dass die generierten Service Worker beide neuen Dateien automatisch in `STATIC_ASSETS` aufnehmen und der Cachehash sich ändert.
-- [ ] `scripts/verify-pages-site.py` um Assertions für vorhandene neue JS-Dateien und Scriptreferenzen erweitern.
-- [ ] `tests/content-build.test.py` um Abwesenheit der entfernten Frontendproperty und Scope-Isolation der neuen Assets ergänzen.
-- [ ] `tests/configure-runtime.test.py` weiterhin unverändert grün halten; nur ändern, wenn eine echte neue Regression abgesichert wird.
-- [ ] `tests/service-worker.test.js` weiterhin grün halten und prüfen, dass externe Apps-Script-Requests nicht durch den Service Worker gecacht werden.
-
-Akzeptanzkriterien:
-
-- [ ] Pull Requests erhalten vollständige Qualitätsprüfung ohne Deploymentsecret.
-- [ ] Push auf `main` deployt erst nach grünen Tests.
-- [ ] Beide Gebäudescopes enthalten Renderer und Kernmodul im eigenen Precache.
-- [ ] Root registriert weiterhin keinen Service Worker.
-- [ ] Keine Root-npm-Abhängigkeit wurde eingeführt.
-
-## Phase 11: Gesamtprüfung und Diff-Review
-
-Arbeitsschritte:
-
-- [ ] Alle Prüfbefehle exakt in der dokumentierten Reihenfolge ausführen.
-- [ ] `git diff --check` ausführen.
-- [ ] `git status --short` und `git diff --stat` prüfen.
-- [ ] Vollständigen `git diff` lesen, besonders Template/generierte Datei, API-Privacy und Betreibertexte.
-- [ ] Nach `python scripts/build-apps-script.py` prüfen, dass `Code.gs` die injizierten JSON-Werte und exakt die Template-Logik enthält.
-- [ ] Keine manuelle Abweichung ausschließlich in `Code.gs` akzeptieren.
-- [ ] `_site` nur als Buildartefakt betrachten; keine dortige Änderung als Quelle übernehmen.
-- [ ] Prüfen, dass vorhandene fremde Worktree-Änderungen nicht verändert wurden.
-- [ ] Nicht committen.
-
-Akzeptanzkriterien:
-
-- [ ] Alle automatisierten Tests sind grün.
-- [ ] Kein Whitespacefehler laut `git diff --check`.
-- [ ] API-Leaktests und Browser-XSS-Tests sind grün.
-- [ ] Nur beabsichtigte Quellen, Tests, Dokumentation und generierte `Code.gs` sind geändert.
-
-## Detailkapitel: Migration und Betriebssicherheit
-
-### Erwarteter Migrationsablauf je Produktionslauf
-
-- [ ] Wartungsfenster beginnen; Betreiber pausieren Änderungen in beiden Sheets.
-- [ ] API-/Scriptkonto hat Zugriff auf beide Sheets.
-- [ ] `migrateSheetsV13()` einmal manuell starten.
-- [ ] Gesamt-Preflight-Ausgabe prüfen.
-- [ ] Nach Erfolg Backup-Tabs und Logeinträge in beiden Sheets kontrollieren.
-- [ ] Zielheader exakt gegen diesen Plan vergleichen.
-- [ ] Stichproben für bestehendes `internal_note` durchführen.
-- [ ] Checkboxen auf `false` und echte Checkboxvalidierung prüfen.
-- [ ] Settingentscheidung je Gebäude kontrollieren.
-- [ ] `migrateSheetsV13()` ein zweites Mal starten und bestätigen, dass keine weiteren Backups oder Datenumschreibungen entstehen.
-
-### Manuelle Live-Prüfungen, die nicht aus dem Repository ableitbar sind
-
-- [ ] Tatsächliche Version-1.2-Header in beiden privaten Sheets.
-- [ ] Vorhandene zusätzliche Betreiber-Spalten.
-- [ ] Formeln in Datenbereichen.
-- [ ] Doppelte Settings.
-- [ ] Aktuelle Werte der Legacy-Master.
-- [ ] Anzahl der Datenzeilen und Apps-Script-Laufzeit.
-- [ ] Existierende Backup-Tabs mit möglichen Namenskollisionen.
-- [ ] Berechtigungen des standalone Scripts und der gebundenen Scripts.
-- [ ] Zeitzone des Apps-Script-Projekts und beider Sheets.
-
-### Kein falsches Atomaritätsversprechen
-
-Die Migration prüft beide Gebäude vorab und schützt den Lauf mit einem Script-Lock. Danach werden zwei getrennte Spreadsheets nacheinander geändert. Ein Plattform-, Berechtigungs- oder Laufzeitfehler kann eintreten, nachdem das erste Spreadsheet bereits erfolgreich geändert wurde. Deshalb sind Sicherungstabs, Wartungsfenster, Ergebnisprotokoll und ein manueller Wiederherstellungsweg verpflichtend. Dokumentation darf diesen Ablauf nicht als Transaktion bezeichnen.
-
-## Detailkapitel: Eingeschränktes Markdown
-
-### Serverseitige Normalisierung
-
-Beispiel Eingabe:
-
-```text
-**Frühlingsfest**\r\nEinlass ab 18 Uhr\rKontakt: [Verein](https://example.org)\u0000
-```
-
-Normalisierte API-Ausgabe:
-
-```text
-**Frühlingsfest**\nEinlass ab 18 Uhr\nKontakt: [Verein](https://example.org)
-```
-
-Der Server interpretiert weder Sternchen noch Links. Das ist wichtig, damit Apps Script nie untrusted HTML erzeugt.
-
-### Browserseitige Whitelist
-
-| Eingabe | Darstellung |
-|---|---|
-| `**Text**` | `<strong>` über DOM |
-| `*Text*` | `<em>` über DOM |
-| Ein LF | `<br>` |
-| Leerzeile | neuer `<p>`-Knoten |
-| `[Seite](https://example.org)` | sicherer externer Link |
-| `[Mail](mailto:test@example.org)` | Mail-Link ohne neuen Tab |
-| `[Alt](http://example.org)` | nur `Alt` als Text |
-| `![Bild](https://example.org/a.png)` | vollständige Syntax als Text, kein Bild |
-| `<img src=x onerror=alert(1)>` | sichtbarer Text, kein Element |
-
-### Abgrenzung zu News und About
-
-`assets/js/ui.js` enthält bereits `markdown()` für News und About. Dieser Renderer escaped zunächst HTML und unterstützt Überschriften, Fett, Kursiv und Zeilenumbrüche. Er wird in Version 1.3 nicht erweitert, nicht durch den neuen Renderer ersetzt und nicht als Buchungsrenderer verwendet. Diese Trennung verhindert unbeabsichtigte Änderungen an bestehenden Inhalten.
-
-## Detailkapitel: UI und Barrierefreiheit
-
-### Listenkarte
-
-Reihenfolge der sichtbaren Informationen:
-
-1. Eckiges Datum-Label.
-2. Zeit oder „Ganzer Tag“.
-3. Statusbadge.
-4. Optional „Veranstaltung“ mit eingeschränktem Markdown.
-5. Optional „Veranstalter“ mit eingeschränktem Markdown.
-
-### Tagesdialog
-
-- Ein statischer Dialog pro Seite.
-- Überschrift enthält das vollständig formatierte Datum.
-- Alle Einträge des Tages erscheinen chronologisch.
-- Jeder Eintrag nutzt denselben Detailrenderer wie die Liste.
-- Der Inhaltsbereich scrollt innerhalb des Viewports.
-- Schließen funktioniert per Button und Escape.
-- Fokus kehrt zum auslösenden Tagesbutton zurück; nach Rerender greift der dokumentierte Fallback.
-
-### Kalenderstatus
-
-| Tagesinhalt | Kalenderstatus | Farbe |
-|---|---|---|
-| Keine Einträge | `free` | Hellgrau |
-| Mindestens ein zeitweiser Eintrag, auch zeitweise Sperrung | `partial` | Bestehender diagonaler Verlauf |
-| Mindestens eine ganztägige bestätigte Buchung, keine ganztägige Sperrung | `busy` | Gebäude-Primärfarbe |
-| Mindestens eine ganztägige Sperrung | `blocked` | `--color-error` |
-
-### Semantik
-
-- Native Buttons statt Rollen-Simulation.
-- Kein ARIA-Grid.
-- Native Dialogsemantik.
-- Monatsnamen als Überschriften.
-- Vollständige Aria-Labels auf nicht freien Tagen.
-- Statusmeldungen ausschließlich über `#occupancyMeta`.
-
-## Detailkapitel: Cache und Datenschutz
-
-### Zustandsautomat
-
-```text
-Netz erfolgreich
-  -> payload normalisieren
-  -> current state stale=false
-  -> {cachedAt: Date.now(), payload} schreiben, Fehler ignorierbar
-  -> rendern
-
-Netzfehler
-  -> v2-Key lesen
-  -> Parse-/Storagefehler: kein Cache
-  -> Alter < 24h: current state stale=true, rendern
-  -> Alter >= 24h oder Zukunft: löschen, nicht rendern
-  -> kein Cache: Ladefehler anzeigen
-```
-
-### Bewusst akzeptiertes Risiko
-
-Die Cacheentscheidung ist fachlich bewusst: Freigegebene Titel und Veranstalter werden vollständig für Offlinebetrieb gespeichert. Wird ein Detail im Sheet oder über den Master nachträglich deaktiviert, kann eine bereits geladene Kopie auf einem Gerät bei Netzfehler bis zum Ablauf von 24 Stunden ab `cachedAt` sichtbar bleiben. Die Implementierung darf dies nicht mit einer kürzeren, unbestimmten oder an `loadedAt` gebundenen Zeit kaschieren. Texte und Dokumentation müssen das Risiko klar benennen.
-
-### Scope-Isolation
-
-Beide Gebäudeseiten teilen im Browser dieselbe Origin, aber nicht denselben Cachekey. `buildingId`, `from` und `to` sind zwingender Teil des Keys. Tests müssen beweisen, dass Daten aus `dgh_rb` nicht als Fallback für `ev_gem_rb` erscheinen und umgekehrt.
-
-## Detailkapitel: Version und Dokumentation
-
-- Version 1.3 ist eine Feature-Version, daher Minor-Anhebung von 1.2.
-- `README.md` und `PROJEKTUEBERSICHT.md` sind die verifizierten Versionsstellen.
-- Keine erfundene Version in Manifest oder JavaScript ergänzen, solange dort aktuell keine Projektversion existiert.
-- `PROJEKTUEBERSICHT.md` bleibt die knappe Architekturübersicht und wird nach der Implementierung aktualisiert.
-- Technische Detailregeln gehören in `docs/google-sheet-struktur.md`, `docs/apps-script-deployment.md` und `DESIGN.md`.
-
-## Vollständige Testmatrix
-
-### API und Freigabe
-
-- [ ] Neuer Master true, Titelflag true, Titel vorhanden: Titel sichtbar.
-- [ ] Neuer Master true, Veranstalterflag true, Veranstalter vorhanden: Veranstalter sichtbar.
-- [ ] Felder unabhängig: nur Titel sichtbar.
-- [ ] Felder unabhängig: nur Veranstalter sichtbar.
-- [ ] Neuer Master false: beide leer.
-- [ ] Neuer Master leer und Legacy true: beide leer.
-- [ ] Neuer Master fehlt und Legacy true: nur jeweils gesetztes Flag sichtbar.
-- [ ] Beide Master fehlen: beide leer.
-- [ ] Flag fehlt: Feld leer.
-- [ ] Text leer/Whitespace: Feld leer.
-- [ ] Interner `title` gesetzt, `public_title` leer: kein Fallback.
-- [ ] Geheimmarker in `title`, `note`, `internal_note`, Requesterfeldern: kein Marker im JSON.
-- [ ] API-Objekt enthält keine privaten Propertynamen.
-- [ ] `schemaVersion` ist Zahl 2.
-- [ ] `publicTitle` und `publicOrganizer` sind immer Strings.
-- [ ] `false` bleibt beim Sheet-Append Boolean.
-
-### Migration
-
-- [ ] Beide exakten Legacy-Schemas werden erkannt.
-- [ ] Beide exakten Zielschemas werden erkannt.
-- [ ] Doppelte Header brechen ab.
-- [ ] Leere Header brechen ab.
-- [ ] Fehlende Header brechen ab.
-- [ ] Unbekannte Header brechen ab.
-- [ ] Falsche Reihenfolge bricht ab.
-- [ ] Doppeltes Setting bricht ab.
-- [ ] Formel in Bookings bricht vor jeder Änderung ab.
-- [ ] Formel in Requests bricht vor jeder Änderung ab.
-- [ ] Formel im zu ändernden Settings-Bereich bricht vor jeder Änderung ab.
-- [ ] `internal_note` bleibt werttreu.
-- [ ] `Requests.note` wird nicht verschoben.
-- [ ] Neue Flags sind Boolean false und Checkboxen.
-- [ ] Neuer Master bleibt erhalten, wenn vorhanden.
-- [ ] Legacy-Wert wird nur bei fehlendem neuen Key übernommen.
-- [ ] Ohne beide Keys entsteht false.
-- [ ] Zweiter Lauf erstellt keine neuen Backups und schreibt keine Daten neu.
-- [ ] Fehlende Validierung im Zielschema wird repariert.
-
-### Markdown und XSS
-
-- [ ] LF, CRLF, CR, Umlaute und ß.
-- [ ] 1000-Zeichen-Grenze.
-- [ ] Absätze und Zeilenumbrüche.
-- [ ] Fett und Kursiv.
-- [ ] HTTPS-Link.
-- [ ] Mailto-Link.
-- [ ] Neuer-Tab-Attribute und Screenreader-Hinweis.
-- [ ] Kein neuer Tab für mailto.
-- [ ] Raw HTML als Text.
-- [ ] Bildsyntax als Text.
-- [ ] Überschrift, Liste, Tabelle, Code nicht als solche gerendert.
-- [ ] `http`, `javascript`, `data`, `vbscript` abgelehnt.
-- [ ] Relative und protokollrelative URLs abgelehnt.
-- [ ] Gemischte Groß-/Kleinschreibung gefährlicher Protokolle abgelehnt.
-- [ ] Fehlerhafte Syntax bleibt sicherer Text.
-- [ ] Keine ausführbaren Elemente oder Eventattribute.
-
-### UI und Accessibility
-
-- [ ] Mehrere Einträge chronologisch.
-- [ ] Identische Liste-/Dialogdetails durch denselben Renderer.
-- [ ] Leere Felder ohne Platzhalter.
-- [ ] Ganztägig blocked rot.
-- [ ] Ganztägig confirmed Primärfarbe.
-- [ ] Zeitweise Belegung partial.
-- [ ] Zeitweise Sperrung partial, Badge rot.
-- [ ] Legende enthält gesperrt.
-- [ ] Klick öffnet Dialog.
-- [ ] Enter öffnet Dialog.
-- [ ] Leertaste öffnet Dialog.
-- [ ] Escape schließt Dialog.
-- [ ] Schließen-Button schließt Dialog.
-- [ ] Fokus kehrt zurück.
-- [ ] Fallbackfokus nach Rerender.
-- [ ] Freier Tag startet Anfrage.
-- [ ] Nicht freier Tag startet keine Anfrage.
-- [ ] Monat ist Überschrift.
-- [ ] Kein ARIA-Grid.
-- [ ] `#occupancyMeta` ist atomarer Status.
-- [ ] `#occupancyList` ist keine Live-Region.
-- [ ] 44-px-Tagesziele.
-- [ ] 390 px ohne horizontalen Overflow.
-- [ ] Dialog intern scrollbar.
-
-### Cache und Scopes
-
-- [ ] Key exakt `occupancy:v2:<buildingId>:<from>:<to>`.
-- [ ] 23:59 gültig.
-- [ ] 24:00 ungültig.
-- [ ] Zukünftiges `cachedAt` ungültig.
-- [ ] TTL verwendet nicht `loadedAt`.
-- [ ] Kaputtes JSON bricht App nicht.
-- [ ] `getItem`-Securityfehler bricht App nicht.
-- [ ] `setItem`-Quota-Fehler bricht App nicht.
-- [ ] `removeItem`-Fehler bricht App nicht.
-- [ ] Alter v1-Key wird nicht gelesen.
-- [ ] Stale bleibt nach Ansichtswechsel.
-- [ ] Stale-Dialog behält Details.
-- [ ] DGH/Gemeindehaus isoliert.
-- [ ] Verschiedene Zeiträume isoliert.
-
-### Regression
-
-- [ ] Buchungsanfrage funktioniert weiter.
-- [ ] Kontaktanfrage funktioniert weiter.
-- [ ] News-Renderer funktional unverändert.
-- [ ] About-Renderer funktional unverändert.
-- [ ] Downloads funktionieren weiter.
-- [ ] Service-Worker-Strategien bleiben grün.
-- [ ] Root bleibt ohne Service Worker.
-- [ ] Beide Gebäudethemes bleiben erhalten.
-- [ ] Scope-Build enthält keine fremden Betreiberinhalte.
-
-## Vollständige Prüfbefehle
-
-Diese Befehle nach der Implementierung exakt in dieser Reihenfolge ausführen:
+| Badge | confirmed in Liste | kein Eintragsbadge „belegt“, Datum/Zeit/Details vorhanden |
+| Badge | confirmed im Dialog | kein Eintragsbadge „belegt“, Kalender-ARIA nennt weiter „belegt“ |
+| Badge | confirmed im Print | kein Eintragsbadge „belegt“ |
+| Badge | blocked | Badge „gesperrt“ in Liste, Dialog und Print sichtbar |
+| Badge | unbekannter `statusKey` | sichtbarer gelieferter/Fallbackbadge |
+| Print Liste | gefüllter Range | nur Kopf und formatierte Liste, kein Monatskalender |
+| Print Plan | gefüllter Range | Monatskalender plus Detailliste nach Seitenumbruch |
+| Print leer | Liste | Kopf plus klare Leermeldung, `window.print()` wird aufgerufen |
+| Print leer | Plan | Kalender des Ranges plus leere Detailliste/Leermeldung nach Umbruch |
+| Print stale | API-Fehler mit frischem Cache | „Möglicherweise veralteter Stand“ im Kopf |
+| Print offline | `navigator.onLine === false` | „Offline erstellt“ im Kopf |
+| Print stale+offline | beide Zustände | beide Marker, keine Mehrdeutigkeit |
+| Print Datenschutz | Snapshot/DOM | keine Formfelder, Namen aus Anfrage, Kontaktwerte, interne Notizen oder unbekannten privaten Properties |
+| Print Direktaufruf | Button | Print-DOM vor instrumentiertem `window.print()` vollständig |
+| Print Tastatur | `beforeprint` | aktuelle Ansicht synchron vorbereitet, null API-Requests |
+| Print Race A/B | Print A vorbereitet, Rangewechsel B lädt, dann `beforeprint` | weder A noch unvollständiges B wird gedruckt; Print-DOM ist leer |
+| Print Race Fehler | Print A vorbereitet, Rangewechsel B scheitert ohne Cache | alter Printinhalt A bleibt auch nach dem Fehler entfernt |
+| Print CSS | `media=print` | nur `#occupancyPrint` sichtbar, Hauptseite/Dialog/Formulare verborgen |
+| Print Range | Payload enthält außerhalb liegende Daten | ausschließlich inklusive Rangegrenzen gedruckt |
+| Print Sortierung | unsortierte gleiche Tage/Zeiten | Datum, Start, Ende, stabile Originalreihenfolge |
+| Markdown | Fett/Kursiv/Absätze/Zeilenumbruch | sicher und formatiert in Dialog/Liste/Print |
+| Links | HTTPS und `mailto:` | sichere Attribute und korrekter Inhalt |
+| Sicherheit | Raw HTML/Bild/Script/`javascript:` | kein ausführbarer oder unerlaubter Knoten |
+| Zeichensatz | `Ä Ö Ü ä ö ü ß` | identisch in Bildschirm- und Print-DOM |
+| Range | `current-month` | heute bis Monatsende |
+| Range | `next-month` | heute bis Ende nächsten Monats |
+| Range | `year` | heute bis Jahresende |
+| Range | `next-year` | vollständiges nächstes Jahr |
+| Range | Monatsklick | genau ein Request für selected-month und danach Liste |
+| View | Plan zu Liste und zurück | lokale Renderer, null zusätzliche Occupancy-Requests |
+| Manuell | Aktualisieren | genau ein Request, Button währenddessen deaktiviert |
+| Loading | alter Inhalt | sichtbar, `inert`, `aria-busy`, Export deaktiviert |
+| Race A/B | A langsam, B schnell | B gewinnt; A überschreibt nichts |
+| Race finally | A endet nach B-Start | B bleibt gesperrt bis B endet |
+| Fetch-Optionen | Initial-, Range-, manuelle und Race-Requests | instrumentiertes `window.fetch` sieht bei jedem Occupancy-Fetch `options.cache === "no-store"` |
+| Fehler | kein Cache | Payload/Range/stale/Dialog/Print leer, Export deaktiviert |
+| Cache | passender frischer Cache | stale-Fallback sichtbar/exportierbar |
+| Cache | exakt TTL | physisch entfernt, nicht verwendet |
+| Cache | ungültig | physisch entfernt, nicht verwendet |
+| Cache | erfolgreicher Onlineabruf | alte `invalid`-/`expired`-Keys des aktiven Gebäudes werden beim Start von `loadOccupancy()` trotzdem physisch entfernt |
+| Cache | anderes Gebäude | vollständig unangetastet |
+| Cache | fremder Key | vollständig unangetastet |
+| Cache | Legacy exakt | nur adressierter Legacy-Key entfernt |
+| Responsive | 390 x 844 | kein horizontaler Overflow, Buttons bedienbar |
+| Jahresansicht | zwölf Monate | Bildschirm renderbar, Printseiten ohne abgeschnittene Raster |
+| Scope | `/DGH/` | DGH-Name, `dgh_rb`, richtige Daten und Cachekeys |
+| Scope | `/Gemeindehaus/` | Gemeindehaus-Name, `ev_gem_rb`, richtige Daten und Cachekeys |
+| Accessibility | Fokus/Dialog | Trigger- oder dokumentierter Fallbackfokus nach Schließen |
+| Accessibility | Screenreaderstatus | Meta `role=status`, atomar; Loading nicht von Viewrenderer überschrieben |
+
+### 15.2 Netzwerkrequest-Zählung
+
+Im Browsertest den gemockten `/exec?action=occupancy`-Handler mitzählen und nach jedem Schritt den exakten Zähler prüfen. Zusätzlich `window.fetch` vor App-Start per `context.add_init_script()` wrappen, für jeden Occupancy-Aufruf `options.cache` protokollieren und am Ende ausnahmslos `"no-store"` erwarten:
+
+1. Initialnavigation: ein Occupancy-Request.
+2. Viewwechsel Plan -> Liste -> Plan: weiterhin ein Request.
+3. Rangewechsel: genau ein weiterer Request.
+4. Manueller Klick: genau ein weiterer Request.
+5. schneller Doppelklick während Loading: höchstens ein weiterer manueller Request.
+6. Printbutton: kein weiterer Request.
+7. `beforeprint`: kein weiterer Request.
+8. Für sämtliche bis dahin gezählten Occupancy-Requests stimmt die Anzahl der instrumentierten Fetch-Optionen mit der Requestanzahl überein und jeder Eintrag hat `cache === "no-store"`.
+
+### 15.3 A/B-Race-Test
+
+Der Mock muss Request A verzögert halten. Danach Range B auswählen und B sofort beantworten. Anschließend A trotz Abort nach Möglichkeit verspätet auflösen. Prüfen:
+
+- sichtbarer Inhalt gehört B;
+- `currentOccupancyRange` wirkt über Export und Viewwechsel ausschließlich als B;
+- Meta nennt B-Datenstand;
+- Printkopf und Details gehören B;
+- A beendet weder `inert` noch `aria-busy`, solange B läuft;
+- A erzeugt keinen sichtbaren Fehler;
+- nur B schreibt einen neuen gültigen Cache für seinen Range.
+
+Zusätzlicher Print-Race-Unterfall:
+
+1. Aus geladenem Range A über den Printbutton Print A vollständig vorbereiten und `window.print()` instrumentiert abfangen.
+2. Range B wählen und dessen Request im Mock offen halten.
+3. Prüfen, dass der Start von `loadOccupancy()` Snapshot A und Print-DOM sofort geleert hat.
+4. Während B lädt `beforeprint` dispatchen. Print-DOM bleibt leer; weder A noch ein unvollständiges B wird ausgegeben.
+5. B ohne passenden Cache fehlschlagen lassen. Print-DOM und Snapshot bleiben leer; kein Inhalt aus A kehrt zurück.
+
+### 15.4 Manuelle Browser- und Gerätefälle
+
+Chromium und Firefox werden in der lokalen Windows-Umgebung geprüft. Safari Desktop, iOS Safari und die installierte iOS-PWA sind verbindliche **externe manuelle Abnahmeschritte**, weil sie lokal unter Windows nicht ausführbar sind. Diese Apple-Prüfungen müssen auf geeigneter Apple-Hardware erfolgen; das Ergebnis wird als kurze Abnahmenotiz im Arbeitsbericht oder PR festgehalten. Eine neue Repositorydatei ist dafür nicht erforderlich.
+
+- Chromium Desktop: Buttondruck, Systemdialog, PDF-Vorschau, Schwarz-Weiß, Hintergrundgrafiken an/aus.
+- Firefox Desktop: A4-Hochformat, Seitenumbrüche, Kalenderbreite, Links und Fonts.
+- Safari Desktop: `beforeprint`, Vorschau, Seitenumbrüche, `inert`-Verhalten.
+- iOS Safari: Share-/Druckablauf, Hochformat, 390-px-nahe Breite, keine abgeschnittenen Inhalte.
+- Installierte PWA in Chromium/Android: Offline starten, frischen Cache anzeigen, Printaktion soweit Plattform unterstützt; klare Offline-/stale-Markierung.
+- Installierte PWA auf iOS: Druck/Teilen soweit Web-App-Modus erlaubt; bei Plattformgrenzen keine falsche direkte Downloadzusage.
+- Beide Gebäudescopes separat prüfen, damit Name, Farbe, Cache und Daten nicht vermischt werden.
+- Jahresansicht und leerer Range jeweils mindestens einmal in echter Druckvorschau prüfen.
+- Ausdruck auf Schwarz-Weiß-Drucker oder monochromer Vorschau prüfen.
+
+## 16. Vollständige Qualitätsmatrix
+
+Nach der Implementierung aus dem Repository-Root in PowerShell vollständig ausführen. Diese vorhandene Pflichtmatrix bleibt vollständig erhalten:
 
 ```pwsh
 python scripts/build-apps-script.py
@@ -1345,124 +651,71 @@ node tests/service-worker.test.js
 python tests/browser.test.py
 ```
 
-Zusätzliche Diff-Prüfungen:
+Zusätzlich den Browser-Druck manuell gemäß Abschnitt 15.4 prüfen. Die unter Windows nicht ausführbaren Apple-Fälle werden extern abgenommen und kurz im Arbeitsbericht oder PR dokumentiert. Ein Fehlschlag wird behoben; Tests werden nicht übersprungen, abgeschwächt oder gelöscht, um Grün zu erzwingen.
 
-```pwsh
-git diff --check
-git status --short
-git diff --stat
-git diff
-```
+## 17. Versionsregel
 
-Für den Browser-Test lokal einmalig:
+Dieses Vorhaben ist eine Featureimplementierung. Nach Projektregel erfolgt deshalb der Sprung:
 
-```pwsh
-python -m pip install playwright==1.61.0
-python -m playwright install chromium
-```
+- Produktdokumentation: `1.3.1` -> `1.4.0`
+- zu ändern: nur Versionsangaben in `README.md` und `PROJEKTUEBERSICHT.md`
+- nicht zu ändern: Produkt-/Backendrelease sowie Apps-Script-/Google-Sheet-Migrationsstand `1.3`
+- ebenfalls nicht zu ändern: öffentliches Occupancy-Response-Schema `schemaVersion: 2`
+- kein neues Versionsfile und kein Paketmanager nur für die Versionsnummer
 
-In CI:
+Die Reihenfolge ist verbindlich: zuerst Feature implementieren und die relevanten Featuretests/Teilmatrix grün ausführen; danach `README.md` und `PROJEKTUEBERSICHT.md` auf `1.4.0` setzen; anschließend die vollständige Qualitätsmatrix als finalen Verifikationslauf erneut ausführen, sodass Build und Prüfungen die Dokumentations-/Versionsänderungen einschließen.
 
-```bash
-python -m pip install playwright==1.61.0
-python -m playwright install --with-deps chromium
-```
+## 18. Rollout
 
-## Deploymentreihenfolge fail closed
+1. Feature in Quellfiles umsetzen und relevante Featuretests/Teilmatrix lokal grün ausführen.
+2. Lokal verfügbare manuelle Druck-, Datenschutz- und PWA-Prüfungen unter Windows abschließen.
+3. `README.md` und `PROJEKTUEBERSICHT.md` auf `1.4.0` setzen; Produkt-/Backendrelease sowie Apps-Script-/Sheet-Migration bleiben `1.3`, das öffentliche Occupancy-Response-Schema bleibt `schemaVersion: 2`.
+4. `_site/` nur durch `python scripts/build-pages-site.py` neu erzeugen; generierte Inhalte nicht manuell korrigieren.
+5. Vollständige Qualitätsmatrix als finalen Verifikationslauf inklusive Dokumentations-/Versionsänderungen ausführen und beide Scopes prüfen.
+6. Safari Desktop, iOS Safari und installierte iOS-PWA extern auf Apple-Hardware abnehmen; kurze Abnahmenotiz im Arbeitsbericht oder PR festhalten, ohne zwingend eine Repositorydatei anzulegen.
+7. Normalen geschützten Pages-Workflow verwenden. Kein Commit, Push oder Deployment ohne ausdrücklichen Benutzerauftrag.
+8. Nach Deployment DGH und Gemeindehaus online öffnen, Rangewechsel/Ansichtswechsel/Refresh prüfen und je einen Listen- und Planausdruck ansehen.
+9. Offline-PWA mit zuvor aufgebautem frischem Cache prüfen; stale/offline muss im Ausdruck sichtbar sein.
 
-Die Reihenfolge ist verbindlich:
+Der bestehende Build erzeugt durch geänderte Assetinhalte automatisch einen neuen Service-Worker-Cachehash. Es ist keine manuelle Cacheversion nötig.
 
-1. [ ] Branch lokal vollständig implementieren, generieren, bauen und mit allen Tests prüfen.
-2. [ ] Kopien beider Sheets anlegen und eine Staging-Apps-Script-Web-App gegen diese Kopien testen.
-3. [ ] Produktive Sheets zusätzlich außerhalb der Migration sichern und Wartungsfenster beginnen.
-4. [ ] Neue rückwärtskompatible, fail-closed API zuerst als neue Version auf der bestehenden `/exec`-Deployment-URL veröffentlichen. Alte Sheets ohne Flags zeigen vorübergehend keine Details.
-5. [ ] API für `dgh_rb` und `ev_gem_rb` prüfen. In private Felder eingetragener Geheimmarker darf nie in der Response erscheinen.
-6. [ ] `migrateSheetsV13()` auf Produktion ausführen, Ergebnis prüfen und zweiten Lauf zur Idempotenzkontrolle starten.
-7. [ ] Gebundenes `apps-script/buchungsverwaltung/Code.gs` in jedem der beiden Sheets separat aktualisieren, speichern, autorisieren und testen.
-8. [ ] Öffentliche Texte und Checkboxen im `Bookings`-Tab bewusst setzen. `public_show_booking_details` erst nach Prüfung je Gebäude aktivieren.
-9. [ ] Frontend/Pages Version 1.3 deployen.
-10. [ ] Live online, offline, mobil, per Tastatur und hinsichtlich CORS prüfen; danach sämtliche Testdaten und Geheimmarker entfernen.
+## 19. Rollback
 
-Live-Prüfungen nach Schritt 9:
+- Bei fachlichem oder technischem Fehler die zusammengehörigen Frontend- und Dokumentationsänderungen auf den letzten freigegebenen Stand zurückrollen und diesen Stand über den normalen Pages-Workflow neu bauen/deployen.
+- Nicht einzelne generierte `_site`-Dateien zurückkopieren.
+- Keine `localStorage.clear()`- oder globale Cachelöschung einführen. Die v2-Records bleiben schemaidentisch; gezielte 24-Stunden-Hygiene genügt.
+- Ein Rollback der Quellen erzeugt beim Build wieder einen passenden Inhalts-Hash. Der Service Worker aktualisiert die App-Shell nach seinen bestehenden Network-First-/Aktivierungsregeln.
+- API, Sheet und Backend benötigen keinen Rollback, weil sie durch das Feature nicht geändert werden.
+- Nach Rollback beide Gebäudescopes, normale Belegungsanzeige, Dialogfokus und manuelle Aktualisierung kurz smoke-testen.
 
-- [ ] Beide `/exec?action=occupancy...`-Antworten enthalten `schemaVersion: 2`.
-- [ ] Unfreigegebene private Marker fehlen.
-- [ ] Titel und Veranstalter schalten unabhängig.
-- [ ] Beide Pages-Scopes verwenden ihre korrekte Gebäude-ID und Farbe.
-- [ ] Dialog funktioniert mit Maus, Enter, Leertaste und Escape.
-- [ ] Fokus kehrt zurück.
-- [ ] 390-px-Mobilansicht hat keinen horizontalen Overflow.
-- [ ] Offlinefall zeigt nur Cache unter 24 Stunden.
-- [ ] CORS-/Redirect-Verhalten der echten Apps-Script-URL funktioniert.
-- [ ] Service Worker kontrolliert nur den jeweiligen Gebäudescope.
+## 20. Definition of Done
 
-## Rollback
+- [ ] Alle verbindlichen Entscheidungen aus Abschnitt 3 sind exakt umgesetzt.
+- [ ] Alle Akzeptanzkriterien aus Abschnitt 14 sind erfüllt.
+- [ ] Automatisierte Matrix aus Abschnitt 16 läuft nach der Versions-/Dokumentationsänderung im finalen Verifikationslauf vollständig grün.
+- [ ] Lokale manuelle Browser-/PWA-Matrix ist durchgeführt; Safari Desktop, iOS Safari und installierte iOS-PWA sind extern abgenommen und kurz im Arbeitsbericht oder PR dokumentiert.
+- [ ] Confirmed-Badge fehlt nur in Eintragsdetails; blocked/unbekannt und Kalender-/ARIA-„belegt“ bleiben korrekt.
+- [ ] Print nutzt nur einen synchronen, gefrorenen Snapshot bereits geladener öffentlicher Daten.
+- [ ] Kein API-Request beim Print und kein DOM-Scraping.
+- [ ] Rangewechsel, Viewwechsel, manueller Refresh und A/B-Races verhalten sich exakt wie spezifiziert.
+- [ ] Cache-TTL wird physisch eingehalten, ohne fremde Gebäude/Keys anzufassen.
+- [ ] Print ist A4 Hochformat, schwarz-weiß verständlich, leer/stale/offline nutzbar und datenschutzkonform.
+- [ ] `DESIGN.md`, `README.md` und `PROJEKTUEBERSICHT.md` spiegeln den umgesetzten Stand.
+- [ ] `README.md` und `PROJEKTUEBERSICHT.md` nennen `1.4.0`; Produkt-/Backendrelease und Apps-Script-/Sheet-Migration bleiben `1.3`, das öffentliche Occupancy-Response-Schema bleibt `schemaVersion: 2`.
+- [ ] Keine Backend-, Apps-Script-, Sheet-, Manifest-, Service-Worker- oder Buildänderung wurde unnötig eingeführt.
+- [ ] Keine Datei unter `_site/` wurde manuell geändert.
+- [ ] Abschließender Git-Diff enthält nur beabsichtigte Änderungen und keine privaten Daten.
 
-### Frontendrollback
+## 21. Warnungen für das ausführende Modell
 
-- [ ] Pages auf den letzten bekannten Build zurücksetzen oder vorheriges Artefakt erneut bereitstellen.
-- [ ] API Version 1.3 weiterlaufen lassen. Das additive API-Schema ist mit dem alten Frontend kompatibel; `publicOrganizer` wird vom alten Frontend ignoriert.
-- [ ] Nicht als erste Maßnahme die API auf Version 1.2 zurückrollen, weil deren `public_title || title`-Fallback das behobene Privacy-Leck wieder einführt.
-
-### API-Rollback
-
-- [ ] Bevor eine alte API-Version unvermeidbar reaktiviert wird, in beiden Settings-Tabs `public_show_booking_titles` ausdrücklich auf `false` setzen.
-- [ ] Neuen Master ebenfalls auf `false` setzen.
-- [ ] API-Responses beider Gebäude mit Geheimmarker testen.
-- [ ] Bevorzugt die Version-1.3-API vorwärts korrigieren statt auf die leckende Version-1.2-Logik zurückzugehen.
-
-### Sheetrollback
-
-- [ ] Wartungsfenster erneut aktivieren und alle Schreibzugriffe pausieren.
-- [ ] Betroffenes Gebäude und Backupzeitstempel eindeutig auswählen.
-- [ ] Aktuellen fehlerhaften Tab zusätzlich sichern.
-- [ ] Backup anhand dokumentierter Header und Zeilenzahlen wiederherstellen.
-- [ ] Nie blind beide Gebäude zurücksetzen, wenn nur eines betroffen ist.
-- [ ] Nach Wiederherstellung API und gebundenes Verwaltungsskript gegen das wiederhergestellte Schema prüfen.
-- [ ] Version-1.3-API kann exakte Legacy-Schemas fail closed lesen; dadurch bleibt ein Sheetrollback ohne Detailleck möglich.
-
-### Cache nach Notfall-Deaktivierung
-
-Eine Server- oder Sheet-Deaktivierung entfernt bereits gespeicherte Browserdaten nicht sofort. Bei einem sensiblen Fehlrelease ist zu dokumentieren, dass öffentliche Details auf Geräten offline bis zu 24 Stunden ab ihrem jeweiligen `cachedAt` sichtbar bleiben können. Ein Pages- oder API-Rollback kann fremden `localStorage` nicht aktiv löschen, solange das Gerät offline ist.
-
-## Definition of Done
-
-- [ ] Zielschemas sind in Code und Dokumentation identisch.
-- [ ] `Bookings.internal_note` wurde werttreu ans Ende migriert.
-- [ ] `Requests.internal_note` existiert und wird korrekt übernommen.
-- [ ] `Requests.note` bleibt Antragstellertext und privat.
-- [ ] Neue Sichtbarkeitsfelder sind echte Checkbox-Booleans mit Default false.
-- [ ] Master-/Fallbacklogik entspricht vollständig der Freigabematrix.
-- [ ] `public_title || title` existiert nirgends mehr.
-- [ ] API enthält `schemaVersion: 2`, `publicTitle` und `publicOrganizer`, aber keine privaten Felder.
-- [ ] Eingeschränkter Markdownrenderer ist DOM-/Whitelist-basiert und Node-/Browser-getestet.
-- [ ] News/About-Markdown funktioniert unverändert.
-- [ ] Liste und Dialog verwenden exakt denselben Buchungsdetailrenderer.
-- [ ] Kalenderstatus, blocked-Legende und Dialoginteraktion entsprechen den Regeln.
-- [ ] Accessibility-Pflichtfälle inklusive Fokus und 390-px-Layout sind getestet.
-- [ ] Cachekey, Recordformat, 24-Stunden-TTL und Storagefehlerbehandlung sind umgesetzt.
-- [ ] Stale-Zustand bleibt bei Ansichtswechsel und Dialog erhalten.
-- [ ] Beide Gebäudescopes sind isoliert.
-- [ ] `migrateSheetsV13()` ist explizit, gesichert, preflighted, blockweise und idempotent.
-- [ ] `setupSheets()` überschreibt keine gefüllten unbekannten Header.
-- [ ] Verwaltungsskript initialisiert öffentliche Felder fail closed und prüft Header.
-- [ ] About-, Datenschutz-, Design-, Sheet-, Deployment- und Projekttexte sind konsistent.
-- [ ] README und Projektübersicht nennen Version 1.3.
-- [ ] Alle vollständigen Prüfbefehle sind grün.
-- [ ] Generiertes `Code.gs` entspricht Template plus Betreiberinjektion.
-- [ ] `_site` wurde nicht manuell editiert.
-- [ ] Vollständiger Diff wurde auf Privacy-Leaks und unbeabsichtigte Änderungen geprüft.
-- [ ] Keine fremden Worktree-Änderungen wurden überschrieben.
-- [ ] Ohne ausdrücklichen Auftrag wurde kein Commit erstellt.
-
-## Abschließende Warnungen
-
-- `apps-script/buchungs-api/Code.gs` nicht manuell pflegen. Jede Änderung gehört in `Code.template.gs` oder die injizierten JSON-Dateien.
-- `_site/**` nicht manuell editieren. Der Ordner wird von `scripts/build-pages-site.py` vollständig neu erzeugt.
-- `setupSheets()` nicht als Migration missbrauchen.
-- `migrateSheetsV13()` nicht ohne Kopien, Gesamt-Preflight und Wartungsfenster auf Produktion starten.
-- Den neuen Master nicht aktivieren, bevor API, Flags, Texte und Geheimmarkertest geprüft sind.
-- Eine alte API mit aktivem Legacy-Master nicht reaktivieren; sie enthält den kritischen internen Titel-Fallback.
-- Keine privaten Daten, Sheet-IDs außerhalb der bereits vorgesehenen Backendkonfiguration oder Produktionssecrets in Frontenddateien oder Browsertests ergänzen.
-- Keine fremden Worktree-Änderungen zurücksetzen oder überschreiben.
-- Nicht committen, solange der Benutzer keinen ausdrücklichen Commit-Auftrag erteilt.
+- Kleinste korrekte Änderungen bevorzugen. Keine neue Architektur oder Bibliothek einführen, wenn vorhandene Renderer und Browserdruck genügen.
+- `DESIGN.md` vor UI-/CSS-Änderungen beachten und bestehende eckige, ruhige, gebäudespezifische Gestaltung erhalten.
+- Deutsche Texte mit korrekten Umlauten und ß schreiben.
+- `_site/` nie manuell bearbeiten; nur Buildausgabe.
+- Keine PDF-Library installieren. `window.print()` ist die verbindliche Lösung.
+- Keine privaten Daten in Snapshot, Print-DOM, Tests, Fixtures, Logs oder Dokumentation aufnehmen.
+- Keine Textfilterung und kein globales CSS zum Entfernen des confirmed-Badges verwenden.
+- Fremde Gebäude- und fremde Storage-Keys niemals löschen.
+- Bestehende fremde Änderungen im Worktree nicht zurücksetzen, überschreiben oder „aufräumen“.
+- Keine Commits, kein Push und kein Deployment ohne ausdrücklichen Auftrag.
+- Nicht behaupten, das Feature sei umgesetzt, bevor Code, Tests, Dokumentation und manuelle Druckprüfung abgeschlossen sind.
