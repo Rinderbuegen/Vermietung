@@ -744,13 +744,13 @@ button:disabled .spinner {
 
   .occupancy-print-legend {
     display: flex;
-    flex-wrap: wrap;
-    gap: 2mm 5mm;
+    flex-wrap: nowrap;
+    gap: 3mm;
     margin: 5mm 0 0;
   }
 
   .occupancy-print-legend h2 { width: 100%; }
-  .occupancy-print-legend-entry { display: flex; align-items: center; gap: 1.5mm; font-weight: 700; }
+  .occupancy-print-legend-entry { display: flex; flex: 0 0 auto; align-items: center; gap: 1.5mm; font-weight: 700; }
   .occupancy-print-legend-symbol {
     position: relative;
     display: block;

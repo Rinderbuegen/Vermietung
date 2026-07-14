@@ -282,7 +282,7 @@ def main() -> None:
         assert page.locator("#occupancyPrint .occupancy-print-plan").count() == 1
         assert page.locator("#occupancyPrint .occupancy-print-details-page").count() == 1
         assert page.locator("#occupancyPrint .occupancy-print-day-marker").count() == 0
-        assert page.locator("#occupancyPrint .occupancy-print-legend-entry").all_inner_texts() == ["frei (leeres Feld)", "belegt (Kreuz)", "teilweise belegt (Diagonale)", "gesperrt (mehrfach schraffiert)"]
+        assert page.locator("#occupancyPrint .occupancy-print-legend-entry").all_inner_texts() == ["frei", "belegt", "teilweise belegt", "gesperrt"]
         assert page.locator("#occupancyPrint .occupancy-print-legend-symbol").count() == 4
         assert page.locator("#occupancyPrint .occupancy-print-legend-symbol .occupancy-print-status-pattern").evaluate_all("nodes => nodes.map(node => [node.dataset.status, node.getAttribute('aria-hidden'), node.querySelectorAll('line').length])") == [["free", "true", 0], ["busy", "true", 2], ["partial", "true", 1], ["blocked", "true", 4]]
         assert page.locator("#occupancyPrint .occupancy-print-day.is-free .occupancy-print-status-pattern").evaluate_all("nodes => nodes.length > 0 && nodes.every(node => node.querySelectorAll('line').length === 0)")
