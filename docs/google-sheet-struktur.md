@@ -1,6 +1,6 @@
 # Google-Sheet-Struktur
 
-`setupSheets()` legt die benötigten Tabs und Header automatisch an. Betreiber können die Daten danach direkt im Sheet pflegen.
+`setupSheets()` legt fehlende Tabs für neue, leere Installationen an und validiert vorhandene Header. Es überschreibt keine gefüllten oder unbekannten Tabellen. Bestehende Version-1.2-Sheets werden ausschließlich im Wartungsfenster mit `migrateSheetsV13()` migriert.
 
 ## Buildings
 
@@ -15,8 +15,25 @@ Sichtbare UI-Texte und der Hero-Kontakt werden unter `betreiber/allgemein/texte`
 ## Bookings
 
 ```text
-booking_id | building_id | date | from | to | title | status | public_title | internal_note | created_at | updated_at
+booking_id | building_id | date | from | to | title | status | public_title | public_title_visible | public_organizer | public_organizer_visible | created_at | updated_at | internal_note
 ```
+
+Die Reihenfolge ist verbindlich. Öffentliche API-Antworten enthalten nur Datum, Zeit, Status, `publicTitle` und `publicOrganizer`; nie die privaten Sheet-Felder.
+
+| Feld | Bedeutung und Öffentlichkeit |
+|---|---|
+| `title` | Interner Buchungszweck, nie öffentlich. |
+| `public_title` | Eingeschränktes Markdown, maximal 1000 Zeichen; nur mit Master und `public_title_visible: true` öffentlich. |
+| `public_title_visible` | Checkbox mit echtem Boolean, Standard `false`; nie öffentlich. |
+| `public_organizer` | Eingeschränktes Markdown, maximal 1000 Zeichen; nur mit Master und `public_organizer_visible: true` öffentlich. |
+| `public_organizer_visible` | Checkbox mit echtem Boolean, Standard `false`; nie öffentlich. |
+| `internal_note` | Interner Betreibervermerk, nie öffentlich. |
+
+Titel und Veranstalter werden unabhängig freigegeben. Text allein veröffentlicht nichts. Ein bewusst freigegebener Personenname oder `mailto:`-Link ist öffentlich und darf erst nach fertiger, geprüfter Datenschutzerklärung veröffentlicht werden.
+
+Erlaubt sind Absätze, einzelne Zeilenumbrüche, `**fett**`, `*kursiv*`, absolute `https:`-Links und `mailto:`-Links. Raw HTML, Bilder, Überschriften, Listen, Tabellen, Code, relative URLs sowie `http:`, `javascript:`, `data:` und `vbscript:` werden nicht als Markdown ausgeführt.
+
+## Statuswerte
 
 Statuswerte:
 
@@ -33,8 +50,10 @@ Zeitformat:
 ## Requests
 
 ```text
-request_id | building_id | date | from | to | requester_name | requester_contact | title | note | status | conflict | created_at | updated_at
+request_id | building_id | date | from | to | requester_name | requester_contact | title | note | status | conflict | created_at | updated_at | internal_note
 ```
+
+`note` ist unverändert der Text der anfragenden Person und bleibt privat. `internal_note` ist der getrennte interne Betreibervermerk. Beim Bestätigen wird nur `Requests.internal_note` nach `Bookings.internal_note` kopiert; `Requests.note` wird weder kopiert noch öffentlich ausgegeben.
 
 Statuswerte:
 
@@ -54,9 +73,21 @@ building_id | key | value
 
 Wichtige Schlüssel:
 
-- `public_show_booking_titles`: `true` oder `false`
+- `public_show_booking_details`: Master für beide öffentlichen Detailfelder dieses Gebäudes. Vorhandener leerer oder falscher Wert gilt als `false`.
+- `public_show_booking_titles`: Legacy-Key. Er bleibt in Version 1.3 erhalten und wird nur gelesen, wenn `public_show_booking_details` als Key fehlt.
+- `maintenance_migrate_sheets_v13`: Interner Wartungsmarker für die Migration. Er ist kein Master für öffentliche Details und steuert keine Veröffentlichung.
 - `notify_email`: Betreiberadresse für Benachrichtigungen
 - `sheet_url`: Link zum Sheet für Benachrichtigungs-E-Mails
+
+Der Master allein reicht nicht: Beide Detailfelder benötigen zusätzlich ihre eigene Checkbox und einen nicht leeren Text. Fehlende Checkboxen gelten immer als `false`. Bei aktivem `maintenance_migrate_sheets_v13` brechen API- und Verwaltungsaktionen, die Daten ändern, fail closed ab.
+
+## Migration Auf Version 1.3
+
+Für gefüllte Version-1.2-Sheets vor dem Frontend-Release ein Wartungsfenster vereinbaren, Betreiberänderungen pausieren und Kopien beider Sheets anlegen. `migrateSheetsV13()` wird im standalone Apps-Script-Projekt bewusst manuell gestartet, nie durch `doGet`, `doPost`, `setupSheets`, `onOpen` oder Trigger.
+
+Der Gesamt-Preflight prüft beide Gebäude vor der ersten Änderung: exakte Header, doppelte Settings und Formeln. Erst nach vollständig erfolgreichem Preflight setzt die Migration `maintenance_migrate_sheets_v13` in beiden Sheets auf aktiv. Solange der Marker aktiv ist, schlagen API- und Verwaltungsänderungen fail closed fehl. Der Lauf sichert geänderte Tabs, migriert maximal 500 Datenzeilen je Block, setzt neue Sichtbarkeitscheckboxen auf echte Booleans `false` und ergänzt den neuen Settings-Key ohne den Legacy-Key zu löschen. Nach Erfolg Backup-Tabs, Logeinträge, Header, Checkboxen und einen zweiten idempotenten Lauf prüfen.
+
+Google Apps Script kann zwei getrennte Spreadsheets nicht global transaktional zurückrollen. Bei einem Fehler nach einer Teiländerung anhand der Backup-Tabs manuell wiederherstellen; keine globale Atomarität annehmen. Erst nach geprüfter Wiederherstellung den Marker in beiden Sheets manuell auf `false` setzen. Er darf nicht vor Abschluss der Prüfung nur in einem Sheet oder automatisch zurückgesetzt werden.
 
 ## Log
 

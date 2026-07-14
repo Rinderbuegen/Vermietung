@@ -7,7 +7,7 @@
       "contactEmail": "kontakt@example.com",
       "notifyEmail": "kontakt@example.com",
       "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
-      "publicShowBookingTitles": false,
+      "publicShowBookingDetails": false,
       "active": true
     },
     "ev_gem_rb": {
@@ -17,7 +17,7 @@
       "contactEmail": "kontakt@example.com",
       "notifyEmail": "kontakt@example.com",
       "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
-      "publicShowBookingTitles": false,
+      "publicShowBookingDetails": false,
       "active": true
     }
   }

@@ -80,7 +80,7 @@
       <section id="belegung" class="section">
         <div class="shell section-grid">
           <div class="section-head">
-            <h2>{{occupancyTitle}}</h2>
+            <h2 id="occupancyHeading" tabindex="-1">{{occupancyTitle}}</h2>
             <p>{{occupancyIntro}}</p>
           </div>
           <div class="panel">
@@ -104,8 +104,8 @@
               </label>
               <button class="button button-secondary" type="submit">{{updateAction}}</button>
             </form>
-            <p class="meta" id="occupancyMeta">{{notLoaded}}</p>
-            <div id="occupancyList" class="list" aria-live="polite"></div>
+            <p class="meta occupancy-meta" id="occupancyMeta" role="status" aria-atomic="true">{{notLoaded}}</p>
+            <div id="occupancyList" class="list"></div>
           </div>
         </div>
       </section>
@@ -240,6 +240,17 @@
       </section>
     </main>
 
+    <dialog id="bookingDetailsDialog" aria-labelledby="bookingDetailsDialogTitle">
+      <div class="booking-dialog-head">
+        <h2 id="bookingDetailsDialogTitle" tabindex="-1">{{bookingDetailsTitle}}</h2>
+        <p>{{bookingDetailsHint}}</p>
+      </div>
+      <div id="bookingDetailsDialogContent" class="booking-dialog-content"></div>
+      <form method="dialog" class="booking-dialog-actions">
+        <button class="button button-secondary" type="submit">{{closeLabel}}</button>
+      </form>
+    </dialog>
+
     <footer class="site-footer">
       <div class="shell footer-grid">
         <span class="footer-updated">{{updatedLabel}} <!--BUILD_TIMESTAMP--></span>
@@ -248,6 +259,8 @@
     </footer>
 
     <script src="assets/js/api.js"></script>
+    <script src="assets/js/frontend-core.js"></script>
+    <script src="assets/js/restricted-markdown.js"></script>
     <script src="assets/js/ui.js"></script>
     <script src="assets/js/app.js"></script>
   </body>

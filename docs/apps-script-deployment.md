@@ -1,257 +1,128 @@
-# Apps-Script-Deployment: Schritt-für-Schritt
+# Apps-Script-Deployment Version 1.3
 
-Diese Anleitung richtet sich an Personen, die Google Apps Script noch nicht genutzt haben. Ziel: Die statische PWA bekommt eine Web-App-URL für Belegung, Buchungsanfragen und Kontaktanfragen. Hinweise und PDF-Downloads liegen im GitHub-Repository und laufen nicht über Apps Script.
+Diese Anleitung beschreibt die öffentliche Apps-Script-Web-App für Belegung, Buchungs- und Kontaktanfragen. Hinweise und PDFs bleiben im GitHub-Repository. Die verbindliche Reihenfolge ist fail closed: Erst API und private Sheets, danach die Pages-Version 1.3.
 
-## Begriffe
+## Vorbedingungen
 
-- `Google Sheet`: die Tabelle, in der Betreiber Gebäude, Belegung und Anfragen pflegen.
-- `Apps Script`: kleines Google-Script, das zwischen PWA und Sheets sitzt.
-- `Web-App`: öffentlich erreichbare URL des Apps Scripts.
-- `setupSheets()`: Hilfsfunktion, die Tabs und Kopfzeilen in den zwei Sheets anlegt.
-- `Deployment-URL`: öffentliche URL, die beim Build über `APPS_SCRIPT_WEB_APP_URL` gesetzt wird.
+- Beide produktiven Sheets manuell sichern und ein Wartungsfenster vereinbaren.
+- Beide tatsächlichen Headerzeilen, Datenmengen, Formeln, Checkboxen und doppelte `(building_id, key)`-Settings prüfen. Repository-Dateien ersetzen diese Live-Prüfung nicht.
+- Vollständige Datenschutzerklärung im Rechtstext ergänzen und rechtlich prüfen. Solange dort ein Platzhalter steht, `public_show_booking_details` nicht aktivieren und weder Personennamen noch `mailto:`-Links als Veranstalter freigeben.
+- Für Staging getrennte Sheet-Kopien und eine getrennte Apps-Script-Web-App verwenden. Keine echten Formulardaten oder Produktionssecrets in Tests verwenden.
 
-## Vorhandene Sheets
-
-Diese beiden Sheets sind im Script fest eingetragen:
+Die beiden produktiven Zuordnungen sind:
 
 ```text
 dgh_rb    -> Dorfgemeinschaftshaus Rinderbügen
-             11yws8ZxRB9U2oyeW8hwwC_WTR1AYLao4_iNkZEIwThc
-
 ev_gem_rb -> Evangelisches Gemeindehaus Rinderbügen
-             1GaqxZtkEx_lByT1odJXkS4Rp80Kr4cuLwFWz32Ssq1E
 ```
 
-## 1. Apps-Script-Projekt Erstellen
+## Quellen Und Bereitstellung
 
-1. Browser öffnen.
-2. `https://script.google.com/` öffnen.
-3. Mit dem Google-Konto anmelden, das Zugriff auf beide Sheets hat.
-4. Links oben auf `Neues Projekt` klicken.
-5. Projektnamen ändern, zum Beispiel `Gebäudevermietung API`.
-6. Datei `Code.gs` im Editor öffnen.
-7. Vorhandenen Inhalt komplett löschen.
-8. `python scripts/build-apps-script.py` ausführen und den vollständigen Inhalt aus `apps-script/buchungs-api/Code.gs` einfügen.
-9. Speichern: Disketten-Symbol oder `Strg+S`.
+`apps-script/buchungs-api/Code.template.gs` ist die Quelle der standalone API. Betreiberwerte werden aus `betreiber/allgemein/backend/` injiziert:
 
-## 2. setupSheets() Ausführen
-
-Diese Funktion bereitet beide Google Sheets vor.
-
-1. Im Apps-Script-Editor oben in der Funktionsauswahl `setupSheets` auswählen.
-2. Auf `Ausführen` klicken.
-3. Beim ersten Mal erscheint eine Berechtigungsabfrage.
-4. Google-Konto auswählen.
-5. Falls Google warnt, dass die App nicht geprüft ist: `Erweitert` anklicken.
-6. `Zu Gebäudevermietung API gehen` anklicken.
-7. Berechtigungen erlauben.
-8. Warten, bis die Ausführung fertig ist.
-
-Erwartetes Ergebnis:
-
-- Beide Sheets bekommen die Tabs `Buildings`, `Bookings`, `Requests`, `Settings`, `Log`, `Contacts`.
-- Die erste Zeile enthält jeweils die passenden Spaltennamen.
-- In `Buildings` wird je Gebäude eine Startzeile angelegt.
-- In `Settings` werden Startwerte angelegt.
-
-Wichtig: `setupSheets()` setzt die Kopfzeilen der Tabs. Nach manuellen Strukturänderungen vorsichtig verwenden.
-
-## 3. Sheets Prüfen Und Betreiberwerte Eintragen
-
-Nach `setupSheets()` beide Sheets öffnen und prüfen.
-
-### Tab `Buildings`
-
-Diese Felder anpassen:
-
-```text
-name
-operator_name
-contact_email
-public_note
+```pwsh
+python scripts/build-apps-script.py
 ```
 
-`active` muss `true` sein.
+Die dadurch erzeugte Datei `apps-script/buchungs-api/Code.gs` wird in das standalone Apps-Script-Projekt kopiert. Sie ist nie manuell zu bearbeiten; jede fachliche Änderung gehört in Template oder Betreiberquellen.
 
-### Tab `Settings`
+Das gebundene Verwaltungsskript `apps-script/buchungsverwaltung/Code.gs` ist getrennt: Es muss nach der API-Migration in jedem der beiden Sheets einzeln aktualisiert, gespeichert, autorisiert und getestet werden.
 
-Diese Werte prüfen:
+## Neue Installation Oder Bestehendes Sheet
 
-```text
-notify_email
-public_show_booking_titles
-sheet_url
-```
+Für ein neues, leeres Sheet `setupSheets()` einmal manuell starten. Die Funktion legt fehlende Tabs mit Version-1.3-Headers an und validiert vorhandene Tabs. Sie überschreibt keine gefüllten Header und migriert keine Daten.
 
-Empfehlung für den Start:
+Für ein bestehendes Version-1.2-Sheet ausschließlich im Wartungsfenster `migrateSheetsV13()` einmal manuell starten. Der Lauf prüft beide Gebäude vor jeder Änderung. Erst nach vollständig erfolgreichem Gesamt-Preflight setzt er den internen Settings-Marker `maintenance_migrate_sheets_v13` in beiden Sheets auf aktiv, erstellt erforderliche Backup-Tabs und migriert blockweise. Solange der Marker aktiv ist, schlagen mutierende API- und Verwaltungsaktionen fail closed fehl. Danach Header, Zeilenanzahl, interne Notizen, Checkboxen, Settings und Logeinträge prüfen. Einen zweiten Lauf starten: Er darf keine Daten erneut schreiben und keine zusätzlichen Backups erzeugen.
 
-```text
-public_show_booking_titles = false
-```
+`maintenance_migrate_sheets_v13` ist ausschließlich ein interner Wartungsmarker, kein Master für öffentliche Details und keine Veröffentlichungsfreigabe. Google Apps Script kann zwei getrennte Spreadsheets nicht als eine globale Transaktion zurückrollen. Tritt nach einer Teiländerung ein Fehler auf, anhand der Backup-Tabs manuell wiederherstellen und erst nach erfolgreicher Prüfung den Marker in beiden Sheets manuell auf `false` setzen. `migrateSheetsV13()` wird nie durch `doGet`, `doPost`, `setupSheets`, `onOpen` oder Trigger ausgeführt.
 
-`notify_email` ist die Adresse, an die neue Buchungsanfragen gesendet werden.
+Details zu Schemas und Migration: `docs/google-sheet-struktur.md`.
 
-## 4. Apps Script Als Web-App Bereitstellen
+## Öffentliche Details Fail Closed
 
-1. Im Apps-Script-Editor rechts oben auf `Bereitstellen` klicken.
-2. `Neue Bereitstellung` wählen.
-3. Neben `Typ auswählen` auf das Zahnrad klicken.
-4. `Web-App` auswählen.
-5. Beschreibung eintragen, zum Beispiel `Erste Version`.
-6. `Ausführen als`: `Ich` auswählen.
-7. `Wer hat Zugriff`: `Jeder` auswählen.
-8. Auf `Bereitstellen` klicken.
-9. Falls erneut Berechtigungen abgefragt werden, bestätigen.
-10. Die `Web-App-URL` kopieren.
+`public_show_booking_details` ist der Master je Gebäude. Ein vorhandener leerer oder falscher Wert gilt als `false`. Nur wenn dieser Key fehlt, wird der erhaltene Legacy-Key `public_show_booking_titles` als Fallback gelesen. Zusätzlich benötigen `public_title` und `public_organizer` jeweils ihre eigene Sichtbarkeitscheckbox und einen nicht leeren Text. Fehlende Checkboxen sind `false`.
 
-Wichtig:
+Die API gibt keine privaten Sheet-Felder aus. `title`, `note`, `internal_note`, Namen, Kontaktdaten, Sichtbarkeitsflags und Zeitstempel sind nie Teil der Belegungsantwort. Freigegebene Details sind auf 1000 Zeichen begrenzt, behalten Zeilenumbrüche und werden erst im Browser mit eingeschränktem Markdown als DOM gerendert.
 
-- Die URL muss auf `/exec` enden.
-- Eine `/dev`-URL ist nur zum Testen im Editor gedacht und nicht für GitHub Pages.
-- `Ausführen als: Ich` ist wichtig, damit die PWA keinen direkten Sheet-Zugriff braucht.
-
-## 5. Web-App Kurz Testen
-
-Die kopierte URL im Browser mit Parametern öffnen.
-
-Beispiel:
-
-```text
-https://script.google.com/macros/s/DEPLOYMENT_ID/exec?action=building&buildingId=dgh_rb
-```
-
-Erwartete Antwort enthält:
+Beispiel für `GET <exec-url>?action=occupancy&buildingId=dgh_rb&from=2026-07-01&to=2026-07-31`:
 
 ```json
 {
   "ok": true,
   "data": {
-    "buildingId": "dgh_rb"
-  }
+    "schemaVersion": 2,
+    "loadedAt": "2026-07-14T10:15:00.000Z",
+    "items": [
+      {
+        "date": "2026-07-18",
+        "from": "18:00",
+        "to": "22:00",
+        "allDay": false,
+        "status": "belegt",
+        "statusKey": "confirmed",
+        "publicTitle": "**Sommerkonzert**",
+        "publicOrganizer": "[Kulturverein](https://example.org/veranstaltungen)"
+      }
+    ]
+  },
+  "message": "OK"
 }
 ```
 
-Wenn `ok` auf `false` steht, die Fehlermeldung lesen. Häufige Ursachen:
+Vor Aktivierung je Gebäude einen Geheimmarkertest durchführen: eindeutige Marker in allen privaten Feldern einer Testbuchung setzen, beide `/exec?action=occupancy...`-Antworten abrufen und bestätigen, dass weder Marker noch private Feldnamen vorkommen. Danach Testdaten und Marker entfernen.
 
-- `setupSheets()` wurde noch nicht ausgeführt.
-- Das Script-Konto hat keinen Zugriff auf die Sheets.
-- Das Gebäude ist im Tab `Buildings` nicht aktiv.
-- Die URL ist nicht die `/exec`-Deployment-URL.
+## Verbindliche Deploymentreihenfolge
 
-## 6. Web-App-URL In Der PWA Eintragen
+1. Lokalen Branch generieren, bauen und mit der vollständigen Qualitätsmatrix testen.
+2. Sheet-Kopien und Staging-Web-App gegen die Version-1.3-API testen.
+3. Produktive Sheets sichern, Wartungsfenster beginnen und API-Konto-Zugriff auf beide Sheets prüfen.
+4. Rückwärtskompatible, fail-closed API als neue Version auf die bestehende `/exec`-URL bereitstellen. Die URL bleibt normalerweise gleich; „Neue Version“ in den Bereitstellungen wählen.
+5. Beide API-Antworten einschließlich Geheimmarkertest prüfen.
+6. `migrateSheetsV13()` manuell ausführen. Nach vollständigem Preflight setzt der Lauf `maintenance_migrate_sheets_v13` in beiden Sheets aktiv; Ergebnisse prüfen und den idempotenten zweiten Lauf durchführen.
+7. Gebundenes Verwaltungsskript in jedem Sheet einzeln aktualisieren und Bestätigen, Ablehnen sowie Sperren testen.
+8. Erst nach Datenschutzerklärung, API-, Migration- und Geheimmarkertest öffentliche Texte und Checkboxen bewusst pflegen; Master je Gebäude erst dann aktivieren.
+9. Nach grüner Qualitätsprüfung auf `main` startet die Pages-Bereitstellung automatisch und wartet im geschützten Environment `github-pages`. Die zuständige Freigabe darf erst nach Abschluss der Schritte 3 bis 8 erteilt werden. `workflow_dispatch` unterstützt einen manuellen Wiederholungslauf derselben Qualität und Bereitstellung.
+10. Online, offline, mobil, per Tastatur und hinsichtlich CORS gegen die echte `/exec`-URL prüfen.
 
-Datei öffnen:
+Bei einem teilweisen Migrationsfehler keine weiteren API- oder Verwaltungsänderungen erzwingen: Backups im betroffenen Sheet wiederherstellen, beide Sheets vollständig prüfen und erst danach `maintenance_migrate_sheets_v13` manuell in beiden Sheets auf `false` setzen.
 
-```text
-betreiber/allgemein/konfiguration/frontend.json
-```
+Die GitHub-Actions-Qualitätsprüfung auf Pull Requests benötigt kein Deploymentsecret und stellt nie Pages bereit. Pushes auf `main` und `workflow_dispatch` stellen erst nach grüner Qualität bereit; das geschützte Environment `github-pages` ist die Freigabeschranke für die abgeschlossene Backend-, Migrations- und Datenschutzcheckliste. Das Deployment nutzt `APPS_SCRIPT_WEB_APP_URL` ausschließlich, um `_site` zur Laufzeit zu konfigurieren.
 
-Diesen Wert ersetzen:
+## Web-App Bereitstellen
 
-```js
-apiBaseUrl: "https://script.google.com/macros/s/DEPLOYMENT_ID/exec",
-```
+1. In `script.google.com` ein standalone Projekt mit Zugriff auf beide Sheets öffnen.
+2. Generierte `apps-script/buchungs-api/Code.gs` einfügen und speichern.
+3. Bei einer neuen, leeren Installation `setupSheets()` manuell ausführen; bei bestehenden Daten stattdessen den oben beschriebenen Migrationsablauf befolgen.
+4. `Bereitstellen` → `Bereitstellungen verwalten` → Web-App bearbeiten → `Neue Version`.
+5. `Ausführen als: Ich` und den benötigten öffentlichen Zugriff wählen.
+6. Die bestehende `/exec`-URL als GitHub-Secret `APPS_SCRIPT_WEB_APP_URL` hinterlegen. `/dev` ist nur für Editor-Tests.
 
-Durch die echte Web-App-URL, zum Beispiel:
+## Qualitätsmatrix Und Lokale Demo
 
-```js
-apiBaseUrl: "https://script.google.com/macros/s/AKfycb.../exec",
-```
+Die schnelle lokale Demo ist kein Ersatz für die vollständige Qualitätsmatrix. `tools\demo-server.cmd` prüft Buildpfade, HTTPS und PWA-Verhalten mit einer Sitzungsvariable; schreibende Formulare nur gegen Staging senden.
 
-## 7. Hinweise Und PDFs Pflegen
-
-Nicht im Apps Script und nicht in Google Drive pflegen.
-
-- PDFs kommen nach `betreiber/<Bereich>/downloads/oeffentlich/`.
-- Hinweise kommen nach `betreiber/<Bereich>/news/`.
-- Metadaten kommen aus PDF-Properties bzw. Markdown-Frontmatter.
-- Die GitHub-Action erzeugt beim Deployment automatisch die Indexdateien.
-
-Siehe `docs/github-content.md`.
-
-## 8. PWA Lokal Testen
-
-Wenn Hinweise oder PDFs lokal ergänzt wurden, zuerst den Index erzeugen:
+Vor Release ausführen:
 
 ```pwsh
 python scripts/build-apps-script.py
 python scripts/build-pages-site.py
+python scripts/verify-pages-site.py
+python tests/content-build.test.py
+python tests/configure-runtime.test.py
+node tests/apps-script.test.js
+node tests/restricted-markdown.test.js
+node tests/frontend-core.test.js
+node tests/service-worker.test.js
+python tests/browser.test.py
 ```
 
-Danach die lokale Demo mit `tools\demo-server.cmd` starten. Voraussetzungen und Aufruf sind in `docs/lokaler-demo-server.md` beschrieben.
+Für den Browser-Test einmalig:
 
-Prüfen:
-
-- Startseite zeigt den richtigen Gebäudenamen.
-- Belegung lädt ohne Fehlermeldung.
-- Hinweise laden aus `assets/data/news.json`.
-- Downloads laden aus `assets/data/downloads.json`.
-- Eine Test-Buchungsanfrage landet im Tab `Requests`.
-- Optional kommt eine E-Mail an `notify_email` an.
-
-## 9. Änderungen Am Script Später Veröffentlichen
-
-Wenn `Code.gs` später geändert wird, reicht Speichern allein nicht immer für die öffentliche Web-App.
-
-Dann:
-
-1. `Bereitstellen` öffnen.
-2. `Bereitstellungen verwalten` wählen.
-3. Bei der Web-App auf den Stift klicken.
-4. Version auf `Neue Version` setzen.
-5. Beschreibung eintragen.
-6. `Bereitstellen` klicken.
-
-Die Web-App-URL bleibt normalerweise gleich.
-
-## 10. Benötigte Berechtigungen
-
-Das Script benötigt:
-
-- Google Sheets: Tabellen lesen und schreiben.
-- MailApp: optionale Benachrichtigungen senden.
-
-Kein Google-Drive-Zugriff für PDFs oder Hinweise.
-
-## 11. API-Aktionen
-
-GET:
-
-```text
-?action=building&buildingId=dgh_rb
-?action=occupancy&buildingId=dgh_rb&from=2026-07-01&to=2026-07-31
+```pwsh
+python -m pip install playwright==1.61.0
+python -m playwright install chromium
 ```
 
-POST-Beispiel:
+## Benötigte Berechtigungen
 
-```json
-{
-  "action": "createBookingRequest",
-  "buildingId": "dgh_rb",
-  "date": "2026-07-15",
-  "from": "18:00",
-  "to": "20:00",
-  "requesterName": "Max Mustermann",
-  "requesterContact": "max@example.com",
-  "title": "Probe",
-  "note": "Kurze Bemerkung"
-}
-```
-
-## 12. Datenschutz Und Rechtliches Fertigstellen
-
-Vor Veröffentlichung in `index.html` ersetzen oder ergänzen:
-
-- Impressum
-- Datenschutzerklärung
-- echte Betreiberadresse
-- echte Kontaktadresse
-- Verantwortliche Stelle
-- Speicherdauer für Anfragen
-
-## 13. Sicherheit TODO Für Spätere Version
-
-- einfaches Rate-Limit
-- Captcha
-- E-Mail-Bestätigung an Anfragende
-- optional Zugriff nur für Google-Konten
+Das standalone Script benötigt Google-Sheets-Zugriff zum Lesen und Schreiben sowie MailApp für optionale Benachrichtigungen. Es benötigt keinen Google-Drive-Zugriff für Hinweise oder PDFs.

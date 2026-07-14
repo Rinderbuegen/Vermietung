@@ -2,6 +2,27 @@
 
 `tools/demo-server.cmd` startet `tools/demo-server.ps1`, erzeugt die GitHub-Pages-Ausgabe und stellt sie mit `tools/Caddyfile` unter lokalem HTTPS bereit. mkcert erzeugt dafür eine lokale Zertifizierungsstelle und ein Zertifikat für `localhost` sowie die LAN-IP. So können beide Gebäudepfade, Service Worker und PWA-Funktionen auf dem Entwicklungsrechner und auf Mobilgeräten im privaten Netz geprüft werden.
 
+## Schnell-Demo Gegen Vollständige Qualitätsmatrix
+
+Die lokale Demo ist eine schnelle, manuelle Integrationsprüfung für Buildausgabe, HTTPS, Pfade, Service Worker und responsive Bedienung. Sie ersetzt nicht die vollständige Release-Qualitätsmatrix: API-Privacy, Migration, eingeschränktes Markdown, Cacheablauf, Fokusführung, XSS und Browserinteraktionen werden mit den Repository-Tests und einer Staging-Web-App geprüft.
+
+Vor einem Release in dieser Reihenfolge ausführen:
+
+```pwsh
+python scripts/build-apps-script.py
+python scripts/build-pages-site.py
+python scripts/verify-pages-site.py
+python tests/content-build.test.py
+python tests/configure-runtime.test.py
+node tests/apps-script.test.js
+node tests/restricted-markdown.test.js
+node tests/frontend-core.test.js
+node tests/service-worker.test.js
+python tests/browser.test.py
+```
+
+`tools/test-demo.py` bleibt zusätzlich sinnvoll, prüft aber keine schreibenden Formulare und ist kein Ersatz für `tests/browser.test.py`. Produktionssheets und die produktive `/exec`-URL gehören nicht in automatisierte Tests.
+
 ## Voraussetzungen
 
 - Windows 10 oder Windows 11.
@@ -171,12 +192,12 @@ Nach jedem Build beide lokalen URLs in einem Browserfenster öffnen und mindeste
 
 Für LAN-Tests dieselben Punkte auf Android oder iOS über die LAN-IP prüfen. `localhost` auf dem Mobilgerät bezeichnet das Mobilgerät selbst und darf dort nicht verwendet werden.
 
-## Playwright-Test
+## Playwright-Schnelltest
 
-`tools/test-demo.py` prüft mit Chromium beide Gebäudeseiten, Secure Context, Gebäudekonfiguration, Manifest- und Service-Worker-Scopes, Weiterleitungen und 404-Antworten. Einmalig Python-Playwright und Chromium installieren:
+`tools/test-demo.py` prüft mit Chromium beide Gebäudeseiten, Secure Context, Gebäudekonfiguration, Manifest- und Service-Worker-Scopes, Weiterleitungen und 404-Antworten. Er ergänzt die vollständige Browserprüfung `tests/browser.test.py`, ersetzt sie aber nicht. Einmalig die in der Qualitätsmatrix festgelegte Playwright-Version und Chromium installieren:
 
 ```pwsh
-python -m pip install playwright
+python -m pip install playwright==1.61.0
 python -m playwright install chromium
 ```
 

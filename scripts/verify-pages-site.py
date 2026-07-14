@@ -18,6 +18,7 @@ SITE = ROOT / "_site"
 SCOPES = ("DGH", "Gemeindehaus")
 BUILDING_IDS = {"DGH": "dgh_rb", "Gemeindehaus": "ev_gem_rb"}
 FORBIDDEN_FINAL_TEXT = ("DEPLOYMENT_ID", "dgh-rb", "ev-gem-rb")
+REQUIRED_FRONTEND_ASSETS = ("assets/js/frontend-core.js", "assets/js/restricted-markdown.js")
 
 
 class LinkParser(HTMLParser):
@@ -76,9 +77,15 @@ def verify_scope(scope: str) -> None:
     assert has_maskable and has_svg, f"{scope}: Maskable- oder SVG-Icon fehlt"
 
     parser = LinkParser()
-    parser.feed((target / "index.html").read_text(encoding="utf-8"))
+    index_html = (target / "index.html").read_text(encoding="utf-8")
+    parser.feed(index_html)
     apple_icon = local_path(base_url, parser.links["apple-touch-icon"], target)
     assert apple_icon.is_file() and png_size(apple_icon) == (192, 192)
+    for asset in REQUIRED_FRONTEND_ASSETS:
+        assert (target / asset).is_file(), f"{scope}: Frontend-Modul fehlt: {asset}"
+        reference = f'<script src="{asset}"></script>'
+        assert reference in index_html, f"{scope}: Scriptreferenz fehlt: {asset}"
+    assert index_html.index('assets/js/frontend-core.js') < index_html.index('assets/js/restricted-markdown.js') < index_html.index('assets/js/ui.js') < index_html.index('assets/js/app.js'), f"{scope}: Scriptreihenfolge ist unsicher"
 
     about = json.loads((target / "assets/data/about.json").read_text(encoding="utf-8"))
     for item in about["items"]:
@@ -96,6 +103,8 @@ def verify_scope(scope: str) -> None:
     assert "__CACHE_HASH__" not in worker and "__STATIC_ASSETS__" not in worker
     assert foreign not in worker, f"{scope}: Service Worker enthält fremde ID"
     assets = json.loads(re.search(r"const STATIC_ASSETS = (\[.*?\]);", worker, re.S).group(1))
+    for asset in REQUIRED_FRONTEND_ASSETS:
+        assert f"./{asset}" in assets, f"{scope}: Frontend-Modul fehlt im Precache: {asset}"
     digest = hashlib.sha256()
     for asset in assets:
         path = target / asset.removeprefix("./")

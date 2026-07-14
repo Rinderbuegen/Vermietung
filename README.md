@@ -1,6 +1,6 @@
 # Gebäudevermietung PWA
 
-Version 1.2. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
+Version 1.3.1. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
 
 ## Öffentliche URLs und IDs
 
@@ -26,10 +26,15 @@ python scripts/build-apps-script.py
 python scripts/build-pages-site.py
 python scripts/verify-pages-site.py
 python tests/content-build.test.py
+python tests/configure-runtime.test.py
+node tests/apps-script.test.js
+node tests/restricted-markdown.test.js
+node tests/frontend-core.test.js
 node tests/service-worker.test.js
+python tests/browser.test.py
 ```
 
-Für eine konfigurierte Demo zusätzlich:
+Für eine konfigurierte Schnell-Demo zusätzlich:
 
 ```pwsh
 $env:APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/.../exec"
@@ -38,10 +43,16 @@ tools\demo-server.cmd
 
 URLs: `https://localhost:8443/Vermietung/DGH/` und `https://localhost:8443/Vermietung/Gemeindehaus/`.
 
+Die Demo prüft lokale Buildpfade, HTTPS und PWA-Verhalten, ersetzt aber weder die vollständige Qualitätsmatrix oben noch Staging- und Live-Prüfungen. Für `tests/browser.test.py` einmalig `python -m pip install playwright==1.61.0` und `python -m playwright install chromium` ausführen.
+
 ## Apps Script und Deployment
 
 Anpassbare Backendwerte, Gebäude-Startdatensätze und Texte stehen unter `betreiber/allgemein/backend/`. `python scripts/build-apps-script.py` erzeugt daraus `apps-script/buchungs-api/Code.gs`; diese Datei ist ohne Browser-Laufzeitabhängigkeit direkt deploybar. `apps-script/buchungsverwaltung/Code.gs` bleibt das direkt einsetzbare gebundene Verwaltungsskript. Rechtstexte stammen ausschließlich aus `betreiber/allgemein/texte/rechtliches.md`; sichtbare Frontendtexte aus `frontend.json` mit optionalen Gebäude-Overrides.
 
-GitHub Actions baut `_site`, ersetzt dort `apiBaseUrl` aus dem Secret `APPS_SCRIPT_WEB_APP_URL`, prüft Scope-Isolation und veröffentlicht das Ergebnis. Die Web-App-URL ist im Browser technisch öffentlich; echte Secrets dürfen nie in Frontend-Betreiberdateien stehen.
+Öffentlich erscheinen Datum, Zeit und Status sowie nur ausdrücklich und fail closed freigegebene Veranstaltungstitel oder Veranstalter. Eingeschränktes Markdown wird sicher gerendert. Freigegebene Details können für Offlinebetrieb bis zu 24 Stunden ab Abruf auf demselben Gerät zwischengespeichert bleiben; private Anfragefelder bleiben im Backend.
+
+Die vollständige Datenschutzerklärung ist harte Voraussetzung, bevor Personennamen oder `mailto:`-Links als öffentliche Veranstalterdetails freigegeben werden. Solange der Rechtstext noch einen Platzhalter enthält, `public_show_booking_details` nicht aktivieren.
+
+GitHub Actions prüft Pull Requests ohne Secrets. Nach grüner Qualitätsprüfung auf `main` läuft die Pages-Bereitstellung bis zur Freigabe im geschützten Environment `github-pages`; diese darf erst nach Backend-, Migrations- und Datenschutzchecks erfolgen. `workflow_dispatch` dient zum Wiederholen. Die Web-App-URL wird ausschließlich beim Deployment aus `APPS_SCRIPT_WEB_APP_URL` in `_site` eingesetzt und ist im Browser technisch öffentlich. Echte Secrets dürfen nie in Frontend-Betreiberdateien stehen.
 
 Weitere Anleitungen: `docs/betreiber-konfiguration.md`, `docs/github-content.md`, `docs/apps-script-deployment.md`, `docs/github-pages-links.md`, `docs/lokaler-demo-server.md`.

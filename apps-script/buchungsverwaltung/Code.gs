@@ -1,5 +1,5 @@
 /**
- * Buchungsverwaltung – gebundenes Google-Apps-Script - V1
+ * Buchungsverwaltung – gebundenes Google-Apps-Script - V1.3.1
  * =======================================================
  *
  * Dieses Script gehört direkt in das Gebäude-Spreadsheet
@@ -37,6 +37,15 @@ function onOpen() {
 // Aktionen – werden aus dem Menü heraus aufgerufen
 // ═══════════════════════════════════════════════════════════════════
 
+const REQUIRED_HEADERS_ = {
+  Bookings: ['booking_id', 'building_id', 'date', 'from', 'to', 'title', 'status', 'public_title', 'public_title_visible', 'public_organizer', 'public_organizer_visible', 'created_at', 'updated_at', 'internal_note'],
+  Requests: ['request_id', 'building_id', 'date', 'from', 'to', 'requester_name', 'requester_contact', 'title', 'note', 'status', 'conflict', 'created_at', 'updated_at', 'internal_note'],
+  Buildings: ['building_id', 'name', 'operator_name', 'contact_email', 'active', 'public_note'],
+  Settings: ['building_id', 'key', 'value'],
+  Log: ['timestamp', 'building_id', 'action', 'reference_id', 'message']
+};
+const MAINTENANCE_MARKER_KEY_ = 'maintenance_migrate_sheets_v13';
+
 /**
  * Ausgewählte Zeile in Requests bestätigen:
  *   - Booking in Bookings anlegen (status = confirmed)
@@ -46,6 +55,7 @@ function onOpen() {
 function approveSelectedRequest() {
   const ui = SpreadsheetApp.getUi();
   try {
+    assertManagementSchemas_();
     const record = getActiveRecord_();
     if (!record || record.sheetName !== 'Requests') {
       ui.alert('Bitte eine Zeile im Tab "Requests" auswählen.');
@@ -72,6 +82,7 @@ function approveSelectedRequest() {
         ui.ButtonSet.YES_NO);
       if (response !== ui.Button.YES) return;
     }
+    const approvedConflict = conflict;
 
     const summary = 'Datum:   ' + data.date + '\n'
       + 'Zeit:    ' + data.from + ' – ' + data.to + '\n'
@@ -87,28 +98,44 @@ function approveSelectedRequest() {
       ui.ButtonSet.YES_NO);
     if (confirm !== ui.Button.YES) return;
 
-    const buildingId = getBuildingId_();
-    const now = new Date().toISOString();
-    const bookingId = Utilities.getUuid();
-
-    appendRow_('Bookings', {
-      booking_id: bookingId,
-      building_id: buildingId,
-      date: data.date,
-      from: data.from,
-      to: data.to,
-      title: data.title,
-      status: 'confirmed',
-      public_title: '',
-      internal_note: '',
-      created_at: now,
-      updated_at: now
-    });
-
-    updateRow_('Requests', data._row, { status: 'approved', updated_at: now });
-    sendApprovalEmail_(buildingId, data);
-    logAction_(buildingId, 'approveRequest', bookingId,
-      'Anfrage ' + data.request_id + ' bestätigt → Booking ' + bookingId);
+    const lock = LockService.getDocumentLock();
+    lock.waitLock(10000);
+    try {
+      assertManagementSchemas_();
+      const current = getActiveRecord_();
+      if (!current || current.sheetName !== 'Requests' || current.data.request_id !== data.request_id
+        || (current.data.status !== 'open' && current.data.status !== 'open_with_conflict')) {
+        throw new Error('Die ausgewählte Anfrage wurde zwischenzeitlich geändert. Bitte erneut prüfen.');
+      }
+      if (checkConflict_(current.data.date, current.data.from, current.data.to) && !approvedConflict) {
+        throw new Error('Die Anfrage kollidiert inzwischen mit einer Buchung oder Sperrung. Bitte erneut prüfen.');
+      }
+      const buildingId = getBuildingId_();
+      const now = new Date().toISOString();
+      const bookingId = Utilities.getUuid();
+      appendRow_('Bookings', {
+        booking_id: bookingId,
+        building_id: buildingId,
+        date: current.data.date,
+        from: current.data.from,
+        to: current.data.to,
+        title: current.data.title,
+        status: 'confirmed',
+        public_title: '',
+        public_title_visible: false,
+        public_organizer: '',
+        public_organizer_visible: false,
+        created_at: now,
+        updated_at: now,
+        internal_note: current.data.internal_note || ''
+      });
+      updateRow_('Requests', current.data._row, { status: 'approved', updated_at: now });
+      SpreadsheetApp.flush();
+      try { sendApprovalEmail_(buildingId, current.data); } catch (error) { console.log('Bestätigung gespeichert, E-Mail fehlgeschlagen: ' + error.message); }
+      try { logAction_(buildingId, 'approveRequest', bookingId, 'Anfrage ' + current.data.request_id + ' bestätigt → Booking ' + bookingId); } catch (error) { console.log('Bestätigung gespeichert, Protokollierung fehlgeschlagen: ' + error.message); }
+    } finally {
+      lock.releaseLock();
+    }
 
     ui.alert('✓ Bestätigt',
       'Die Anfrage wurde als Booking übernommen.\n'
@@ -128,6 +155,7 @@ function approveSelectedRequest() {
 function rejectSelectedRequest() {
   const ui = SpreadsheetApp.getUi();
   try {
+    assertManagementSchemas_();
     const record = getActiveRecord_();
     if (!record || record.sheetName !== 'Requests') {
       ui.alert('Bitte eine Zeile im Tab "Requests" auswählen.');
@@ -150,13 +178,24 @@ function rejectSelectedRequest() {
       ui.ButtonSet.OK_CANCEL);
     if (reason.getSelectedButton() !== ui.Button.OK) return;
 
-    const buildingId = getBuildingId_();
-    const now = new Date().toISOString();
-
-    updateRow_('Requests', data._row, { status: 'rejected', updated_at: now });
-    sendRejectionEmail_(buildingId, data, reason.getResponseText());
-    logAction_(buildingId, 'rejectRequest', data.request_id,
-      'Anfrage ' + data.request_id + ' abgelehnt');
+    const lock = LockService.getDocumentLock();
+    lock.waitLock(10000);
+    try {
+      assertManagementSchemas_();
+      const current = getActiveRecord_();
+      if (!current || current.sheetName !== 'Requests' || current.data.request_id !== data.request_id
+        || (current.data.status !== 'open' && current.data.status !== 'open_with_conflict')) {
+        throw new Error('Die ausgewählte Anfrage wurde zwischenzeitlich geändert. Bitte erneut prüfen.');
+      }
+      const buildingId = getBuildingId_();
+      const now = new Date().toISOString();
+      updateRow_('Requests', current.data._row, { status: 'rejected', updated_at: now });
+      SpreadsheetApp.flush();
+      try { sendRejectionEmail_(buildingId, current.data, reason.getResponseText()); } catch (error) { console.log('Ablehnung gespeichert, E-Mail fehlgeschlagen: ' + error.message); }
+      try { logAction_(buildingId, 'rejectRequest', current.data.request_id, 'Anfrage ' + current.data.request_id + ' abgelehnt'); } catch (error) { console.log('Ablehnung gespeichert, Protokollierung fehlgeschlagen: ' + error.message); }
+    } finally {
+      lock.releaseLock();
+    }
 
     ui.alert('✓ Abgelehnt',
       'Die Anfrage wurde abgelehnt.',
@@ -218,32 +257,39 @@ function confirmBlock(data) {
     throw new Error('Bitte alle Pflichtfelder ausfüllen.');
   }
 
-  const buildingId = getBuildingId_();
-  const now = new Date().toISOString();
-  const bookingId = Utilities.getUuid();
-
-  const conflict = checkConflict_(data.date, data.from, data.to);
-  if (conflict) {
-    throw new Error('Am ' + data.date + ' besteht bereits eine Buchung oder Sperrung\n'
-      + 'im Zeitraum ' + data.from + ' – ' + data.to + '.');
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(10000);
+  try {
+    assertManagementSchemas_();
+    const buildingId = getBuildingId_();
+    const now = new Date().toISOString();
+    const bookingId = Utilities.getUuid();
+    const conflict = checkConflict_(data.date, data.from, data.to);
+    if (conflict) {
+      throw new Error('Am ' + data.date + ' besteht bereits eine Buchung oder Sperrung\n'
+        + 'im Zeitraum ' + data.from + ' – ' + data.to + '.');
+    }
+    appendRow_('Bookings', {
+      booking_id: bookingId,
+      building_id: buildingId,
+      date: data.date,
+      from: data.from,
+      to: data.to,
+      title: data.title,
+      status: 'blocked',
+      public_title: '',
+      public_title_visible: false,
+      public_organizer: '',
+      public_organizer_visible: false,
+      internal_note: data.note || '',
+      created_at: now,
+      updated_at: now
+    });
+    SpreadsheetApp.flush();
+    try { logAction_(buildingId, 'blockTimeRange', bookingId, 'Sperrzeit ' + data.date + ' ' + data.from + '–' + data.to + ' (' + data.title + ')'); } catch (error) { console.log('Sperrung gespeichert, Protokollierung fehlgeschlagen: ' + error.message); }
+  } finally {
+    lock.releaseLock();
   }
-
-  appendRow_('Bookings', {
-    booking_id: bookingId,
-    building_id: buildingId,
-    date: data.date,
-    from: data.from,
-    to: data.to,
-    title: data.title,
-    status: 'blocked',
-    public_title: '',
-    internal_note: data.note || '',
-    created_at: now,
-    updated_at: now
-  });
-
-  logAction_(buildingId, 'blockTimeRange', bookingId,
-    'Sperrzeit ' + data.date + ' ' + data.from + '–' + data.to + ' (' + data.title + ')');
 
   return '✓ Sperrzeit eingetragen:\n'
     + data.date + ', ' + data.from + ' – ' + data.to + '\n'
@@ -270,16 +316,56 @@ function showHelp() {
     + '  1. Menü → "Zeitraum sperren"\n'
     + '  2. Datum, Zeiten, Grund eingeben\n'
     + '  → Wartungs-/Schließtage eintragen\n\n'
-    + 'Hinweise:\n'
+     + 'Hinweise:\n'
     + '  • Alle Aktionen werden im Tab "Log" dokumentiert\n'
     + '  • Bei Konflikten warnt das Script vor dem Bestätigen\n'
-    + '  • Bei Rückfragen: Betreiber-E-Mail aus Settings-Tab',
+     + '  • Öffentliche Details werden nur direkt im Tab "Bookings" gepflegt:\n'
+     + '    public_title und public_organizer sowie beide Sichtbarkeits-Checkboxen.\n'
+     + '    Text allein veröffentlicht nichts; zusätzlich muss der Master\n'
+     + '    public_show_booking_details im Tab "Settings" aktiv sein.\n'
+     + '  • Namen und mailto:-Adressen nur nach bewusster öffentlicher Freigabe eintragen.\n'
+     + '  • Bei Rückfragen: Betreiber-E-Mail aus Settings-Tab',
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // Hilfsfunktionen – lesen/schreiben Daten im aktiven Spreadsheet
 // ═══════════════════════════════════════════════════════════════════
+
+function assertManagementSchemas_() {
+  Object.keys(REQUIRED_HEADERS_).forEach(assertRequiredHeaders_);
+  assertMaintenanceMarkerInactive_();
+}
+
+function assertMaintenanceMarkerInactive_() {
+  const buildingId = getBuildingId_();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Settings');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const buildingColumn = headers.indexOf('building_id');
+  const keyColumn = headers.indexOf('key');
+  const valueColumn = headers.indexOf('value');
+  const markers = [];
+  for (let row = 1; row < data.length; row++) {
+    if (String(data[row][buildingColumn] || '').trim() === buildingId
+      && String(data[row][keyColumn] || '').trim() === MAINTENANCE_MARKER_KEY_) markers.push(data[row][valueColumn]);
+  }
+  if (markers.length > 1) throw new Error('Wartungsmarker ist doppelt vorhanden. Mutationen sind gesperrt.');
+  if (markers.length && isTruthy_(markers[0])) throw new Error('Wartungsarbeiten laufen. Mutationen sind bis zur manuellen Freigabe gesperrt.');
+}
+
+function assertRequiredHeaders_(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error('Tab "' + sheetName + '" nicht gefunden.');
+  if (sheet.getLastRow() < 1) throw new Error('Tab "' + sheetName + '" hat nicht das Schema von Version 1.3. Fehlende Spalten: ' + REQUIRED_HEADERS_[sheetName].join(', ') + '.');
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const expected = REQUIRED_HEADERS_[sheetName];
+  const missing = expected.filter((header) => headers.indexOf(header) === -1);
+  const duplicate = headers.some((header, index) => headers.indexOf(header) !== index);
+  const exact = headers.length === expected.length && headers.every((header, index) => header === expected[index]);
+  if (missing.length) throw new Error('Tab "' + sheetName + '" hat nicht das Schema von Version 1.3. Fehlende Spalten: ' + missing.join(', ') + '.');
+  if (duplicate || !exact) throw new Error('Tab "' + sheetName + '" hat nicht das exakte Schema von Version 1.3.');
+}
 
 /**
  * Liefert die aktuell ausgewählte Zeile als Datenobjekt.
@@ -368,6 +454,7 @@ function checkConflict_(date, from, to) {
  * Spalten-Reihenfolge wird aus den Headern (Zeile 1) abgeleitet.
  */
 function appendRow_(sheetName, data) {
+  assertMaintenanceMarkerInactive_();
   const sheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(sheetName);
   if (!sheet) throw new Error('Tab "' + sheetName + '" nicht gefunden.');
@@ -379,8 +466,19 @@ function appendRow_(sheetName, data) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   }
 
-  const row = headers.map(h => data[h] || '');
-  sheet.appendRow(row);
+  const row = headers.map(h => valueOrEmpty_(data[h]));
+  const lastSheetRow = sheet.getLastRow();
+  const existingRows = lastSheetRow > 1
+    ? sheet.getRange(2, 1, lastSheetRow - 1, headers.length).getValues()
+    : [];
+  let targetRow = 2;
+  for (let i = existingRows.length - 1; i >= 0; i--) {
+    if (existingRows[i].some(value => value !== '' && value !== null && value !== undefined && value !== false)) {
+      targetRow = i + 3;
+      break;
+    }
+  }
+  sheet.getRange(targetRow, 1, 1, headers.length).setValues([row]);
 }
 
 /**
@@ -388,6 +486,7 @@ function appendRow_(sheetName, data) {
  * rowIndex ist die absolute Zeilennummer im Sheet (1-basiert).
  */
 function updateRow_(sheetName, rowIndex, data) {
+  assertMaintenanceMarkerInactive_();
   const sheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(sheetName);
   if (!sheet) throw new Error('Tab "' + sheetName + '" nicht gefunden.');
@@ -397,9 +496,8 @@ function updateRow_(sheetName, rowIndex, data) {
 
   Object.keys(data).forEach((key) => {
     const col = headers.indexOf(key);
-    if (col !== -1) {
-      sheet.getRange(rowIndex, col + 1).setValue(data[key]);
-    }
+    if (col === -1) throw new Error('Tab "' + sheetName + '" enthält die Spalte "' + key + '" nicht.');
+    sheet.getRange(rowIndex, col + 1).setValue(valueOrEmpty_(data[key]));
   });
 }
 
@@ -550,7 +648,12 @@ function formatCell_(value, header) {
   if (value instanceof Date) {
     return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   }
-  return String(value || '').trim();
+  if (typeof value === 'boolean') return value;
+  return String(valueOrEmpty_(value)).trim();
+}
+
+function valueOrEmpty_(value) {
+  return value === null || value === undefined ? '' : value;
 }
 
 function toMinutes_(value) {

@@ -10,7 +10,7 @@ Seriöse, ruhige Oberfläche für öffentliche Gebäudevermietung der Stadt Büd
 - Mobile-first: Formularfelder groß genug, Navigation bricht sauber um.
 - Barrierearm: sichtbarer Fokus, ausreichende Kontraste, echte Labels.
 - Vertrauenswürdig: gedämpfte Flächen, klare Statusfarben, wenig Dekoration.
-- Datenschutzfreundlich: keine Tracker, keine personenbezogenen Daten im öffentlichen Cache.
+- Datenschutzfreundlich: keine Tracker und keine privaten oder personenbezogenen Anfragedaten im öffentlichen Cache. Bewusst freigegebene öffentliche Veranstaltungsdetails dürfen für Offlinebetrieb höchstens 24 Stunden ab `cachedAt` gespeichert werden.
 - Markenkonform: Farben, Schriften und Stilmittel von stadt-buedingen.de.
 
 ## Farben
@@ -118,6 +118,22 @@ Weiße Karte mitrand und Schatten:
 
 - `list-item`: Belegung, Hinweis oder Download.
 - Datum-Label: Hintergrund `#6c0e15`, Text weiß, eckig.
+- Buchungsdetailkarte: eckiges Datum-Label, Zeit, Statusbadge und nur bei Freigabe die Blöcke „Veranstaltung“ und „Veranstalter“.
+- `blocked` verwendet immer die rote Statusfarbe, auch als ganztägiger Kalenderstatus und in der Legende.
+
+### Buchungsdetails und Dialog
+
+- Belegte Tage öffnen einen nativen, eckigen `<dialog>`; freie Tage bleiben Buchungsaktionen.
+- Der Dialog hat einen intern scrollenden Inhaltsbereich, bleibt innerhalb des Viewports und gibt den Fokus beim Schließen an den auslösenden Tagesbutton zurück.
+- Bei einem Rerender ohne verbundenen Auslöser geht der Fokus auf die Belegungsansicht, ersatzweise auf deren Überschrift.
+- Tagesbuttons haben mindestens 44 px Zielgröße. Bei 390 px Breite darf kein horizontaler Overflow entstehen.
+- Kalenderstatus: ganztägig `blocked` vor ganztägig `confirmed`, danach `partial`, sonst `free`.
+
+### Öffentliche Detailtexte
+
+Freigegebene Veranstaltung und Veranstalter verwenden ausschließlich eingeschränktes Markdown. Erlaubt sind Absätze, einzelne Zeilenumbrüche, `**fett**`, `*kursiv*`, absolute `https:`-Links und `mailto:`-Links. Raw HTML, Bilder, Überschriften, Listen, Tabellen, Code, relative URLs sowie `http:`, `javascript:`, `data:` und `vbscript:` bleiben Text.
+
+Der Renderer baut nur `p`, `br`, `strong`, `em`, `a` und den Screenreader-Hinweis als DOM-Knoten. HTTPS-Links erhalten `target="_blank"` und `rel="noopener noreferrer"` sowie den Hinweis „öffnet in einem neuen Tab“; `mailto:`-Links nicht.
 
 ### Statusanzeigen
 
@@ -145,7 +161,7 @@ Weiße Karte mitrand und Schatten:
 
 ## Per-Gebäude-Design
 
-Jedes Gebäude hat eigene Farben, die in `config/<Gebäude>/config.js` unter `theme` definiert und vor dem CSS-Laden als CSS-Variablen injiziert werden. Layout und Typografie bleiben gleich.
+Jedes Gebäude hat eigene Farben, die in `betreiber/<Bereich>/konfiguration/frontend.json` unter `theme` definiert und im Build vor dem CSS-Laden als CSS-Variablen injiziert werden. Layout und Typografie bleiben gleich.
 
 ### Farbzuordnung
 
@@ -171,16 +187,15 @@ Farben entnommen aus dem Designsystem der Evangelischen Kirchengemeinde Nidderbr
 
 ### Technische Umsetzung
 
-1. `config/config.js` definiert gemeinsame Werte und das URL-Pfad-Mapping.
-2. `config/<Gebäude>/config.js` definiert pro Gebäude ein `theme`-Objekt mit den CSS-Variablen-Werten.
-3. Ein Inline-Script im `<head>` lädt anhand des URL-Pfads die passende Gebäudekonfiguration und setzt die CSS-Variablen per `document.documentElement.style.setProperty()`.
-4. Das CSS (`app.css`) lädt danach mit den überschriebenen Werten.
-5. Kein Flash of wrong colors, da die Konfiguration vor dem CSS-Link geladen wird.
+1. Die Quellen `betreiber/allgemein/konfiguration/frontend.json` und `betreiber/<Bereich>/konfiguration/frontend.json` enthalten gemeinsame Werte beziehungsweise Gebäude-Overrides.
+2. `scripts/build-pages-site.py` erzeugt je Root und Gebäudescope eine eigene `config/config.js` mit der aufgelösten Laufzeitkonfiguration und stabiler Gebäude-ID.
+3. `index.html` lädt diese erzeugte Datei vor dem Stylesheet. Das folgende Inline-Script setzt die Theme-Werte per `document.documentElement.style.setProperty()`.
+4. Das CSS (`app.css`) verwendet danach die überschriebenen Werte. Der Build liefert je Scope nur die aufgelöste `config/config.js` aus.
 
 ### Neues Gebäude hinzufügen
 
-1. Neues Verzeichnis `config/<Gebäude>/` mit eigener `config.js` anlegen.
-2. In `config/config.js` das URL-Pfad-Mapping in `buildingIdByPath` ergänzen.
+1. Neues Betreiberverzeichnis `betreiber/<Bereich>/` mit `konfiguration/frontend.json` anlegen.
+2. Die Zuordnung aus URL-Pfad und Gebäude-ID in `betreiber/allgemein/konfiguration/registry.json` ergänzen.
 3. Farbwerte in der Tabelle oben dokumentieren.
 
 ## Navigation

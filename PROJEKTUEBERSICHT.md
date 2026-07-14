@@ -2,7 +2,7 @@
 
 ## Stand
 
-Version 1.2. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
+Version 1.3.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
 
 ## Architektur
 
@@ -16,15 +16,17 @@ Version 1.2. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfr
 - PWA: Build erzeugt für beide Gebäude einen scope-eigenen Service Worker. Sein Cache-Key hasht Pfade und Inhalte aller Precache-Dateien. Root bleibt ohne Worker.
 - Texte: sichtbare UI-Texte kommen aus `betreiber/allgemein/texte/frontend.json`, Rechtstexte aus `rechtliches.md`; Gebäude können `frontend.json` überschreiben.
 - Backend: Google Apps Script und private Google Sheets. `scripts/build-apps-script.py` injiziert Betreiberkonfiguration/-texte in direkt deploybares `apps-script/buchungs-api/Code.gs`.
-- Runtime: `scripts/configure-runtime.py` ersetzt nur die öffentliche Apps-Script-Web-App-URL im Buildartefakt.
+- Runtime: `scripts/configure-runtime.py` ersetzt nur die öffentliche Apps-Script-Web-App-URL im Buildartefakt. Quellen für Laufzeitwerte liegen unter `betreiber/**/konfiguration/frontend.json`; `config/config.js` ist ein scope-eigenes Buildprodukt.
+- Öffentliche Details: API-Schema 2 gibt optional `publicTitle` und `publicOrganizer` aus, ausschließlich mit fail-closed Master, Feldcheckbox und nicht leerem Text. Eingeschränktes Markdown wird im Browser über eine DOM-Whitelist gerendert.
+- Offlinecache: Vollständige öffentliche Details können pro Gebäude und Zeitraum höchstens 24 Stunden ab `cachedAt` in `localStorage` bleiben; private Anfragefelder werden nicht gecacht.
 
 ## Betrieb
 
 - Pages: `https://Rinderbuegen.github.io/Vermietung/DGH/` und `https://Rinderbuegen.github.io/Vermietung/Gemeindehaus/`.
 - Demo: `tools/demo-server.cmd`, Caddy/mkcert, HTTPS auf `localhost:8443` und optional im LAN.
-- Tests: `scripts/verify-pages-site.py`, `tests/content-build.test.py`, `tests/service-worker.test.js`, optional `tools/test-demo.py` mit Playwright.
-- Workflow: `.github/workflows/pages.yml` baut Apps Script und Pages, prüft vor und nach Runtime-Konfiguration und lädt nur `_site` hoch.
+- Tests: vollständige Pflichtmatrix aus Pages-Verifikation, Content-/Runtime-Tests, Apps-Script-, Markdown-, Frontend-Kern-, Service-Worker- und `tests/browser.test.py`. `tools/test-demo.py` bleibt eine zusätzliche schnelle Demo-Prüfung.
+- Workflow: `.github/workflows/pages.yml` prüft Pushes, Pull Requests und Wiederholungsläufe ohne Deploymentsecret. Nach grüner Qualität auf `main` wartet Pages auf die Freigabe im geschützten Environment `github-pages`; diese erfolgt erst nach Backend-, Migrations- und Datenschutzchecks. `workflow_dispatch` startet einen Wiederholungslauf.
 
 ## Datenschutz
 
-Öffentlich erscheinen nur Datum, Uhrzeit, Status und optional freigegebener Titel. Namen, Kontaktdaten, interne Notizen und Anfragehistorie bleiben im Backend. Keine vertraulichen Werte unter `betreiber/**/konfiguration/frontend.json` ablegen.
+Öffentlich erscheinen Datum, Uhrzeit, Status und optional ausdrücklich freigegebener Titel oder Veranstalter. Namen, Kontaktdaten, interne Notizen und Anfragehistorie bleiben im Backend, sofern ein Betreiber sie nicht bewusst als öffentlichen Veranstalter freigibt. Freigegebene Details können offline bis zu 24 Stunden sichtbar bleiben. Vor Freigabe von Personennamen oder `mailto:`-Links muss die Datenschutzerklärung fertig und geprüft sein. Keine vertraulichen Werte oder Sicherheitsfreigaben unter `betreiber/**/konfiguration/frontend.json` ablegen.

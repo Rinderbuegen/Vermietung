@@ -7,7 +7,7 @@ const BACKEND_CONFIG = {
       "contactEmail": "kontakt@example.com",
       "notifyEmail": "kontakt@example.com",
       "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
-      "publicShowBookingTitles": false,
+      "publicShowBookingDetails": false,
       "active": true
     },
     "ev_gem_rb": {
@@ -17,7 +17,7 @@ const BACKEND_CONFIG = {
       "contactEmail": "kontakt@example.com",
       "notifyEmail": "kontakt@example.com",
       "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
-      "publicShowBookingTitles": false,
+      "publicShowBookingDetails": false,
       "active": true
     }
   }
@@ -36,12 +36,19 @@ const BACKEND_TEXTS = {
 
 const SHEET_HEADERS = {
   Buildings: ["building_id", "name", "operator_name", "contact_email", "active", "public_note"],
-  Bookings: ["booking_id", "building_id", "date", "from", "to", "title", "status", "public_title", "internal_note", "created_at", "updated_at"],
-  Requests: ["request_id", "building_id", "date", "from", "to", "requester_name", "requester_contact", "title", "note", "status", "conflict", "created_at", "updated_at"],
+  Bookings: ["booking_id", "building_id", "date", "from", "to", "title", "status", "public_title", "public_title_visible", "public_organizer", "public_organizer_visible", "created_at", "updated_at", "internal_note"],
+  Requests: ["request_id", "building_id", "date", "from", "to", "requester_name", "requester_contact", "title", "note", "status", "conflict", "created_at", "updated_at", "internal_note"],
   Settings: ["building_id", "key", "value"],
   Log: ["timestamp", "building_id", "action", "reference_id", "message"],
   Contacts: ["contact_id", "building_id", "name", "contact", "subject", "message", "created_at"]
 };
+
+const LEGACY_SHEET_HEADERS_V12 = {
+  Bookings: ["booking_id", "building_id", "date", "from", "to", "title", "status", "public_title", "internal_note", "created_at", "updated_at"],
+  Requests: ["request_id", "building_id", "date", "from", "to", "requester_name", "requester_contact", "title", "note", "status", "conflict", "created_at", "updated_at"]
+};
+const MIGRATION_CHUNK_SIZE = 500;
+const MAINTENANCE_MARKER_KEY = "maintenance_migrate_sheets_v13";
 
 const STATUS_LABELS = {
   confirmed: "belegt",
@@ -75,17 +82,36 @@ function doPost(e) {
 }
 
 function setupSheets() {
-  Object.keys(SPREADSHEETS_BY_BUILDING_ID).forEach(setupSheetForBuilding);
+  const plans = Object.keys(SPREADSHEETS_BY_BUILDING_ID).map(preflightSetupSpreadsheet_);
+  plans.forEach(applySetupSpreadsheet_);
 }
 
 function setupSheetForBuilding(buildingId) {
-  const initial = BACKEND_CONFIG.buildings[buildingId];
+  applySetupSpreadsheet_(preflightSetupSpreadsheet_(buildingId));
+}
+
+function preflightSetupSpreadsheet_(buildingId) {
   const spreadsheet = openSpreadsheet(buildingId);
+  const existing = Object.keys(SHEET_HEADERS).map((sheetName) => ({ sheetName: sheetName, sheet: spreadsheet.getSheetByName(sheetName) }));
+  const productive = spreadsheet.getSheets().some((sheet) => sheet.getLastRow() > 1);
+  existing.forEach((entry) => {
+    if (!entry.sheet) {
+      if (productive) throw appError("SCHEMA_ERROR", "Einrichtung abgebrochen: " + buildingId + " / Tab \"" + entry.sheetName + "\" fehlt in einem bereits befüllten Spreadsheet.");
+      return;
+    }
+    if (entry.sheet.getLastRow() > 0) readAndClassifyHeaders_(entry.sheet, entry.sheetName);
+  });
+  return { buildingId: buildingId, spreadsheet: spreadsheet, existing: existing };
+}
+
+function applySetupSpreadsheet_(plan) {
+  const buildingId = plan.buildingId;
+  const initial = BACKEND_CONFIG.buildings[buildingId];
   Object.keys(SHEET_HEADERS).forEach((sheetName) => {
-    const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
-    const headers = SHEET_HEADERS[sheetName];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    const sheet = plan.spreadsheet.getSheetByName(sheetName) || plan.spreadsheet.insertSheet(sheetName);
+    if (sheet.getLastRow() === 0) sheet.getRange(1, 1, 1, SHEET_HEADERS[sheetName].length).setValues([SHEET_HEADERS[sheetName]]);
     sheet.setFrozenRows(1);
+    if (headersEqual_(readHeaderCells_(sheet), SHEET_HEADERS[sheetName])) applySheetFormattingV13_(sheetName, sheet);
   });
 
   upsertRow("Buildings", "building_id", buildingId, {
@@ -97,12 +123,13 @@ function setupSheetForBuilding(buildingId) {
     public_note: initial.publicNote
   }, buildingId);
 
-  upsertSetting(buildingId, "public_show_booking_titles", String(initial.publicShowBookingTitles));
+  upsertSetting(buildingId, "public_show_booking_details", initial.publicShowBookingDetails);
   upsertSetting(buildingId, "notify_email", initial.notifyEmail);
-  upsertSetting(buildingId, "sheet_url", spreadsheet.getUrl());
+  upsertSetting(buildingId, "sheet_url", plan.spreadsheet.getUrl());
 }
 
 function getBuilding(buildingId) {
+  assertSheetSchema_(buildingId, "Buildings", false);
   const rows = readRows(buildingId, "Buildings");
   const row = rows.find((item) => item.building_id === buildingId && isTruthy(item.active));
   if (!row) throw appError("NOT_FOUND", "Das Gebäude ist nicht aktiv oder nicht vorhanden.");
@@ -116,15 +143,17 @@ function getBuilding(buildingId) {
 }
 
 function getOccupancy(buildingId, from, to) {
+  assertMutationSheets_(buildingId, ["Buildings", "Bookings", "Settings"]);
   assertActiveBuilding(buildingId);
   const range = normalizeDateRange(from, to);
   const settings = getSettings(buildingId);
-  const showTitles = String(settings.public_show_booking_titles || "false") === "true";
+  const showDetails = publicBookingDetailsEnabled(settings);
   const bookings = readRows(buildingId, "Bookings")
     .filter((row) => row.building_id === buildingId && ["confirmed", "blocked"].includes(row.status))
     .filter((row) => dateInRange(row.date, range.from, range.to))
-    .map((row) => publicOccupancyRow(row, showTitles));
+    .map((row) => publicOccupancyRow(row, showDetails));
   return {
+    schemaVersion: 2,
     loadedAt: new Date().toISOString(),
     items: bookings.sort(sortByDateAndTime)
   };
@@ -132,11 +161,14 @@ function getOccupancy(buildingId, from, to) {
 
 function createBookingRequest(data) {
   const buildingId = requireBuildingId(data.buildingId);
-  assertActiveBuilding(buildingId);
   const cleaned = validateBookingRequest(data);
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
+    assertMutationSheets_(buildingId, ["Buildings", "Bookings", "Requests", "Settings", "Log"]);
+    assertActiveBuilding(buildingId);
+    assertMaintenanceMarkerInactive_(buildingId);
+    getSettings(buildingId);
     const conflict = checkBookingConflict(buildingId, cleaned.date, cleaned.from, cleaned.to);
     const requestId = Utilities.getUuid();
     const now = new Date().toISOString();
@@ -153,10 +185,11 @@ function createBookingRequest(data) {
       status: conflict ? "open_with_conflict" : "open",
       conflict: conflict ? "true" : "false",
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      internal_note: ""
     });
-    logAction(buildingId, "createBookingRequest", requestId, conflict ? "Anfrage mit Konflikt gespeichert." : "Anfrage gespeichert.");
-    sendNotificationEmail(buildingId, cleaned);
+    SpreadsheetApp.flush();
+    runPostPersistence_(buildingId, "createBookingRequest", requestId, cleaned, conflict);
     return { requestId: requestId, conflict: conflict };
   } finally {
     lock.releaseLock();
@@ -165,25 +198,38 @@ function createBookingRequest(data) {
 
 function createContactRequest(data) {
   const buildingId = requireBuildingId(data.buildingId);
-  assertActiveBuilding(buildingId);
   const cleaned = {
     name: sanitizeRequired(data.name, "Name", 120),
     contact: sanitizeRequired(data.contact, "Kontaktmöglichkeit", 160),
     subject: sanitizeRequired(data.subject, "Betreff", 140),
     message: sanitizeRequired(data.message, "Nachricht", 1200)
   };
-  const contactId = Utilities.getUuid();
-  appendRow(buildingId, "Contacts", {
-    contact_id: contactId,
-    building_id: buildingId,
-    name: cleaned.name,
-    contact: cleaned.contact,
-    subject: cleaned.subject,
-    message: cleaned.message,
-    created_at: new Date().toISOString()
-  });
-  logAction(buildingId, "createContactRequest", contactId, "Kontaktanfrage gespeichert.");
-  return { contactId: contactId };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    assertMutationSheets_(buildingId, ["Buildings", "Contacts", "Log"]);
+    assertActiveBuilding(buildingId);
+    assertMaintenanceMarkerInactive_(buildingId);
+    const contactId = Utilities.getUuid();
+    appendRow(buildingId, "Contacts", {
+      contact_id: contactId,
+      building_id: buildingId,
+      name: cleaned.name,
+      contact: cleaned.contact,
+      subject: cleaned.subject,
+      message: cleaned.message,
+      created_at: new Date().toISOString()
+    });
+    SpreadsheetApp.flush();
+    try {
+      logAction(buildingId, "createContactRequest", contactId, "Kontaktanfrage gespeichert.");
+    } catch (error) {
+      console.log("Kontaktanfrage gespeichert, Protokollierung fehlgeschlagen: " + error.message);
+    }
+    return { contactId: contactId };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function checkBookingConflict(buildingId, date, from, to) {
@@ -227,7 +273,20 @@ function sendNotificationEmail(buildingId, requestData) {
   try {
     MailApp.sendEmail(target, BACKEND_TEXTS.mailBookingSubject + ": " + building.name, body);
   } catch (error) {
-    logAction(buildingId, "sendNotificationEmail", "", "E-Mail-Versand fehlgeschlagen: " + error.message);
+    console.log("E-Mail-Versand fehlgeschlagen: " + error.message);
+  }
+}
+
+function runPostPersistence_(buildingId, action, requestId, requestData, conflict) {
+  try {
+    logAction(buildingId, action, requestId, conflict ? "Anfrage mit Konflikt gespeichert." : "Anfrage gespeichert.");
+  } catch (error) {
+    console.log("Buchungsanfrage gespeichert, Protokollierung fehlgeschlagen: " + error.message);
+  }
+  try {
+    sendNotificationEmail(buildingId, requestData);
+  } catch (error) {
+    console.log("Buchungsanfrage gespeichert, E-Mail-Versand fehlgeschlagen: " + error.message);
   }
 }
 
@@ -270,6 +329,345 @@ function openSpreadsheet(buildingId) {
   return SpreadsheetApp.openById(SPREADSHEETS_BY_BUILDING_ID[requireBuildingId(buildingId)]);
 }
 
+function readHeaderCells_(sheet) {
+  const width = sheet.getLastColumn();
+  if (width < 1) return [];
+  return sheet.getRange(1, 1, 1, width).getValues()[0].map((value) => String(value).trim());
+}
+
+function headersEqual_(actual, expected) {
+  return actual.length === expected.length && actual.every((header, index) => header === expected[index]);
+}
+
+function assertExactHeaders_(actual, allowed, context) {
+  const hasEmpty = actual.some((header) => !header);
+  const hasDuplicate = new Set(actual).size !== actual.length;
+  if (hasEmpty || hasDuplicate || !allowed.some((headers) => headersEqual_(actual, headers))) {
+    throw appError("SCHEMA_ERROR", "Schemafehler: " + context + " hat unbekannte, leere, doppelte oder falsch angeordnete Kopfzeilen.");
+  }
+}
+
+function readAndClassifyHeaders_(sheet, sheetName) {
+  const headers = readHeaderCells_(sheet);
+  const allowed = sheetName === "Bookings" || sheetName === "Requests"
+    ? [SHEET_HEADERS[sheetName], LEGACY_SHEET_HEADERS_V12[sheetName]]
+    : [SHEET_HEADERS[sheetName]];
+  if (!allowed[0]) throw appError("SCHEMA_ERROR", "Unbekannter Tab: " + sheetName);
+  assertExactHeaders_(headers, allowed, "Tab \"" + sheetName + "\"");
+  return {
+    headers: headers,
+    schema: headersEqual_(headers, SHEET_HEADERS[sheetName]) ? "v13" : "v12"
+  };
+}
+
+function assertSheetSchema_(buildingId, sheetName, allowLegacy) {
+  const sheet = openSpreadsheet(buildingId).getSheetByName(sheetName);
+  if (!sheet) throw appError("SCHEMA_ERROR", buildingId + " / Tab \"" + sheetName + "\" fehlt.");
+  const classified = readAndClassifyHeaders_(sheet, sheetName);
+  if (!allowLegacy && classified.schema !== "v13") {
+    throw appError("SCHEMA_ERROR", buildingId + " / Tab \"" + sheetName + "\" hat nicht das Schema von Version 1.3.");
+  }
+  return classified;
+}
+
+function assertMutationSheets_(buildingId, sheetNames) {
+  sheetNames.forEach((sheetName) => assertSheetSchema_(buildingId, sheetName, sheetName === "Bookings" || sheetName === "Requests"));
+}
+
+function migrateSheetsV13() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  const backups = [];
+  let migrationPlan;
+  let maintenanceMarkerAttempted = false;
+  try {
+    migrationPlan = preflightAllSpreadsheetsV13_();
+    const timestamp = Utilities.formatDate(new Date(), "UTC", "yyyyMMdd_HHmmss");
+    assertBackupSlotsAvailableV13_(migrationPlan, timestamp);
+    maintenanceMarkerAttempted = true;
+    setMaintenanceMarkersV13_(migrationPlan, true);
+    migrationPlan.forEach((buildingPlan) => {
+      buildingPlan.backups.forEach((sheetName) => {
+        backups.push(backupSheetV13_(buildingPlan.sheets[sheetName], timestamp));
+      });
+    });
+    migrationPlan.forEach((buildingPlan) => {
+      ["Bookings", "Requests"].forEach((sheetName) => {
+        const sheetPlan = buildingPlan.sheetPlans[sheetName];
+        if (sheetPlan.schema === "v12") migrateRowsByHeaderV13_(sheetPlan.sheet, sheetPlan.headers, SHEET_HEADERS[sheetName]);
+        applySheetFormattingV13_(sheetName, sheetPlan.sheet);
+      });
+      if (buildingPlan.settingAction !== "none") migratePublicDetailsSettingV13_(buildingPlan.buildingId);
+      logMigrationResultV13_(buildingPlan.buildingId, "Migration V1.3 abgeschlossen (" + buildingPlan.oldSchemas + ").");
+      console.log("Migration V1.3: " + buildingPlan.buildingId + ", " + buildingPlan.oldSchemas + ", Backups: " + buildingPlan.backups.join(", "));
+    });
+    setMaintenanceMarkersV13_(migrationPlan, false);
+  } catch (error) {
+    const backupText = backups.length ? " Wiederherstellung aus folgenden Sicherungen prüfen: " + backups.join(", ") + "." : "";
+    if (maintenanceMarkerAttempted) {
+      try {
+        setMaintenanceMarkersV13_(migrationPlan, true);
+      } catch (markerError) {
+        console.log("Wartungsmarker konnte nicht erneut gesetzt werden: " + markerError.message);
+      }
+      throw new Error("Migration abgebrochen. " + error.message + backupText + " Der Wartungsmarker \"" + MAINTENANCE_MARKER_KEY + "\" bleibt aktiv. Nach Wiederherstellung aus den Sicherungen den Marker in beiden Settings-Tabs manuell auf false setzen.");
+    }
+    throw new Error("Migration abgebrochen. " + error.message + backupText);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function preflightAllSpreadsheetsV13_() {
+  const plans = Object.keys(SPREADSHEETS_BY_BUILDING_ID).map(preflightSpreadsheetV13_);
+  return Object.freeze(plans.map((plan) => Object.freeze({
+    buildingId: plan.buildingId,
+    spreadsheet: plan.spreadsheet,
+    sheets: Object.freeze(plan.sheets),
+    sheetPlans: Object.freeze(Object.keys(plan.sheetPlans).reduce((result, sheetName) => {
+      result[sheetName] = Object.freeze(plan.sheetPlans[sheetName]);
+      return result;
+    }, {})),
+    settingAction: plan.settingAction,
+    markerAction: plan.markerAction,
+    backups: Object.freeze(plan.backups.slice()),
+    oldSchemas: plan.oldSchemas
+  })));
+}
+
+function preflightSpreadsheetV13_(buildingId) {
+  const spreadsheet = openSpreadsheet(buildingId);
+  const sheetPlans = {};
+  Object.keys(SHEET_HEADERS).forEach((sheetName) => {
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / Tab " + sheetName + " fehlt.");
+    const classified = readAndClassifyHeaders_(sheet, sheetName);
+    assertNoHeaderFormulas_(sheet, classified.headers.length, buildingId, sheetName);
+    if (sheetName !== "Bookings" && sheetName !== "Requests" && classified.schema !== "v13") {
+      throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / Tab " + sheetName + " hat kein gültiges Schema.");
+    }
+    sheetPlans[sheetName] = { sheet: sheet, headers: classified.headers, schema: classified.schema };
+  });
+  assertNoDuplicateSettings_(sheetPlans.Settings.sheet, buildingId);
+  ["Bookings", "Requests"].forEach((sheetName) => {
+    const item = sheetPlans[sheetName];
+    if (item.schema === "v12") assertNoFormulasInMigrationRange_(item.sheet, item.headers.length, buildingId, sheetName);
+  });
+  const settingsRows = readRowsFromSheet_(sheetPlans.Settings.sheet);
+  assertNoActiveMaintenanceMarkerV13_(settingsRows, buildingId);
+  const settingAction = planPublicDetailsSettingV13_(settingsRows, buildingId);
+  const markerAction = planMaintenanceMarkerV13_(settingsRows, buildingId);
+  assertNoFormulasInMigrationRange_(sheetPlans.Settings.sheet, SHEET_HEADERS.Settings.length, buildingId, "Settings");
+  const backups = planMigrationBackupsV13_(sheetPlans, settingAction, markerAction);
+  return {
+    buildingId: buildingId,
+    spreadsheet: spreadsheet,
+    sheets: Object.keys(sheetPlans).reduce((result, sheetName) => { result[sheetName] = sheetPlans[sheetName].sheet; return result; }, {}),
+    sheetPlans: sheetPlans,
+    settingAction: settingAction,
+    markerAction: markerAction,
+    backups: backups,
+    oldSchemas: "Bookings=" + sheetPlans.Bookings.schema + ", Requests=" + sheetPlans.Requests.schema
+  };
+}
+
+function planPublicDetailsSettingV13_(settingsRows, buildingId) {
+  const current = settingsRows.filter((row) => row.building_id === buildingId);
+  if (current.some((row) => row.key === "public_show_booking_details")) return "none";
+  return current.some((row) => row.key === "public_show_booking_titles") ? "copyLegacy" : "addFalse";
+}
+
+function planMaintenanceMarkerV13_(settingsRows, buildingId) {
+  const markers = settingsRows.filter((row) => row.building_id === buildingId && row.key === MAINTENANCE_MARKER_KEY);
+  if (markers.length > 1) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / Settings enthält einen doppelten Wartungsmarker.");
+  return markers.length ? "reuse" : "insert";
+}
+
+function planMigrationBackupsV13_(sheetPlans, settingAction, markerAction) {
+  const backups = ["Bookings", "Requests"].filter((sheetName) => sheetPlans[sheetName].schema === "v12");
+  if (settingAction !== "none" || markerAction === "insert") backups.push("Settings");
+  return backups;
+}
+
+function assertNoActiveMaintenanceMarkerV13_(settingsRows, buildingId) {
+  const markers = settingsRows.filter((row) => row.building_id === buildingId && row.key === MAINTENANCE_MARKER_KEY);
+  planMaintenanceMarkerV13_(settingsRows, buildingId);
+  if (markers.length && isTruthy(markers[0].value)) {
+    throw appError("MAINTENANCE", "Migration abgebrochen: " + buildingId + " / Settings ist noch im Wartungsmodus. Zuerst Wiederherstellung prüfen und den Wartungsmarker manuell auf false setzen.");
+  }
+}
+
+function backupNameV13_(sheetName, timestamp) {
+  return sheetName + "_backup_v13_" + timestamp;
+}
+
+function assertBackupSlotsAvailableV13_(plan, timestamp) {
+  const slots = {};
+  plan.forEach((buildingPlan) => {
+    buildingPlan.backups.forEach((sheetName) => {
+      const backupName = backupNameV13_(sheetName, timestamp);
+      const slot = buildingPlan.spreadsheet.getId() + "\u0000" + backupName;
+      if (hasOwn(slots, slot)) throw appError("MIGRATION_ERROR", "Migration abgebrochen: Backup " + backupName + " ist für mehrere Gebäude vorgesehen.");
+      if (buildingPlan.spreadsheet.getSheetByName(backupName)) throw appError("MIGRATION_ERROR", "Migration abgebrochen: Backup " + backupName + " existiert bereits.");
+      slots[slot] = true;
+    });
+  });
+}
+
+function setMaintenanceMarkersV13_(plan, active) {
+  plan.forEach((buildingPlan) => setMaintenanceMarkerV13_(buildingPlan.buildingId, active));
+  SpreadsheetApp.flush();
+}
+
+function setMaintenanceMarkerV13_(buildingId, active) {
+  const sheet = openSpreadsheet(buildingId).getSheetByName("Settings");
+  const headers = readAndClassifyHeaders_(sheet, "Settings").headers;
+  const buildingColumn = headers.indexOf("building_id") + 1;
+  const keyColumn = headers.indexOf("key") + 1;
+  const valueColumn = headers.indexOf("value") + 1;
+  const values = sheet.getDataRange().getValues();
+  const matches = [];
+  for (let row = 1; row < values.length; row++) {
+    if (String(valueOrEmpty(values[row][buildingColumn - 1])).trim() === buildingId
+      && String(valueOrEmpty(values[row][keyColumn - 1])).trim() === MAINTENANCE_MARKER_KEY) matches.push(row + 1);
+  }
+  if (matches.length > 1) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / Settings enthält einen doppelten Wartungsmarker.");
+  if (matches.length) {
+    sheet.getRange(matches[0], valueColumn).setValue(active);
+    return;
+  }
+  sheet.appendRow(headers.map((header) => {
+    if (header === "building_id") return buildingId;
+    if (header === "key") return MAINTENANCE_MARKER_KEY;
+    if (header === "value") return active;
+    return "";
+  }));
+}
+
+function assertMaintenanceMarkerInactive_(buildingId) {
+  const settings = getSettings(buildingId);
+  if (isTruthy(settings[MAINTENANCE_MARKER_KEY])) throw appError("MAINTENANCE", "Wartungsarbeiten laufen. Bitte später erneut versuchen.");
+}
+
+function assertNoHeaderFormulas_(sheet, width, buildingId, sheetName) {
+  const formulas = sheet.getRange(1, 1, 1, width).getFormulas()[0];
+  const columnIndex = formulas.findIndex((formula) => formula);
+  if (columnIndex !== -1) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / " + sheetName + " enthält eine Formel in Kopfzeile, Spalte " + (columnIndex + 1) + ".");
+}
+
+function assertNoDuplicateSettings_(sheet, buildingId) {
+  const seen = {};
+  readRowsFromSheet_(sheet).forEach((row, index) => {
+    const building = String(valueOrEmpty(row.building_id)).trim();
+    const key = String(valueOrEmpty(row.key)).trim();
+    const valuesPresent = Object.keys(row).some((header) => valueOrEmpty(row[header]) !== "");
+    if (valuesPresent && (!building || !key)) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / Settings enthält eine unvollständige Zeile " + (index + 2) + ".");
+    if (!building && !key) return;
+    const compound = building + "\u0000" + key;
+    if (hasOwn(seen, compound)) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / Settings enthält einen doppelten Schlüssel " + key + ".");
+    seen[compound] = true;
+  });
+}
+
+function assertNoFormulasInMigrationRange_(sheet, width, buildingId, sheetName) {
+  assertNoHeaderFormulas_(sheet, width, buildingId, sheetName);
+  const lastRow = sheet.getLastRow();
+  for (let start = 2; start <= lastRow; start += MIGRATION_CHUNK_SIZE) {
+    const size = Math.min(MIGRATION_CHUNK_SIZE, lastRow - start + 1);
+    const formulas = sheet.getRange(start, 1, size, width).getFormulas();
+    for (let rowIndex = 0; rowIndex < formulas.length; rowIndex++) {
+      const columnIndex = formulas[rowIndex].findIndex((formula) => formula);
+      if (columnIndex !== -1) throw appError("SCHEMA_ERROR", "Migration abgebrochen: " + buildingId + " / " + sheetName + " enthält eine Formel in Zeile " + (start + rowIndex) + ", Spalte " + sheet.getRange(1, columnIndex + 1).getValue() + ".");
+    }
+  }
+}
+
+function backupSheetV13_(sheet, timestamp) {
+  const backupName = backupNameV13_(sheet.getName(), timestamp);
+  const spreadsheet = sheet.getParent();
+  if (spreadsheet.getSheetByName(backupName)) throw appError("MIGRATION_ERROR", "Migration abgebrochen: Backup " + backupName + " existiert bereits.");
+  sheet.copyTo(spreadsheet).setName(backupName);
+  return backupName;
+}
+
+function migrateRowsByHeaderV13_(sheet, sourceHeaders, targetHeaders) {
+  const lastRow = sheet.getLastRow();
+  if (sheet.getMaxColumns() < targetHeaders.length) sheet.insertColumnsAfter(sheet.getMaxColumns(), targetHeaders.length - sheet.getMaxColumns());
+  sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+  for (let start = 2; start <= lastRow; start += MIGRATION_CHUNK_SIZE) {
+    const size = Math.min(MIGRATION_CHUNK_SIZE, lastRow - start + 1);
+    const values = sheet.getRange(start, 1, size, sourceHeaders.length).getValues();
+    const targetValues = values.map((source) => {
+      const row = {};
+      sourceHeaders.forEach((header, index) => { row[header] = source[index]; });
+      return targetHeaders.map((header) => {
+        if (header === "public_title_visible" || header === "public_organizer_visible") return false;
+        if (header === "public_organizer" || (header === "internal_note" && !hasOwn(row, "internal_note"))) return "";
+        return valueOrEmpty(row[header]);
+      });
+    });
+    sheet.getRange(start, 1, size, targetHeaders.length).setValues(targetValues);
+  }
+  SpreadsheetApp.flush();
+  const actual = readHeaderCells_(sheet);
+  if (!headersEqual_(actual, targetHeaders) || sheet.getLastRow() !== lastRow) throw appError("MIGRATION_ERROR", "Migration abgebrochen: " + sheet.getName() + " konnte nicht geprüft werden.");
+}
+
+function migratePublicDetailsSettingV13_(buildingId) {
+  const sheet = openSpreadsheet(buildingId).getSheetByName("Settings");
+  const rows = readRowsFromSheet_(sheet);
+  const legacy = rows.find((row) => row.building_id === buildingId && row.key === "public_show_booking_titles");
+  appendRow(buildingId, "Settings", {
+    building_id: buildingId,
+    key: "public_show_booking_details",
+    value: legacy ? legacy.value : false
+  });
+}
+
+function applySheetFormattingV13_(sheetName, sheet) {
+  const headers = readHeaderCells_(sheet);
+  if (!headersEqual_(headers, SHEET_HEADERS[sheetName])) return;
+  sheet.setFrozenRows(1);
+  const dataRows = Math.max(1, sheet.getLastRow() - 1);
+  const column = (header) => headers.indexOf(header) + 1;
+  if (column("date")) sheet.getRange(2, column("date"), dataRows, 1).setNumberFormat("yyyy-mm-dd");
+  ["from", "to"].forEach((header) => { if (column(header)) sheet.getRange(2, column(header), dataRows, 1).setNumberFormat("hh:mm"); });
+  ["public_title", "public_organizer", "note", "internal_note"].forEach((header) => {
+    if (column(header)) sheet.getRange(2, column(header), dataRows, 1).setWrap(true);
+  });
+  ["public_title_visible", "public_organizer_visible"].forEach((header) => {
+    if (!column(header)) return;
+    repairVisibilityValuesV13_(sheet, column(header), sheet.getLastRow() - 1);
+    const validation = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+    sheet.getRange(2, column(header), Math.max(500, dataRows), 1).setDataValidation(validation);
+  });
+}
+
+function repairVisibilityValuesV13_(sheet, column, dataRows) {
+  if (dataRows < 1) return;
+  for (let start = 2; start <= dataRows + 1; start += MIGRATION_CHUNK_SIZE) {
+    const size = Math.min(MIGRATION_CHUNK_SIZE, dataRows + 2 - start);
+    const values = sheet.getRange(start, column, size, 1).getValues();
+    if (!values.some((row) => typeof row[0] !== "boolean")) continue;
+    sheet.getRange(start, column, size, 1).setValues(values.map((row) => [typeof row[0] === "boolean" ? row[0] : false]));
+  }
+}
+
+function logMigrationResultV13_(buildingId, message) {
+  logAction(buildingId, "migrateSheetsV13", "", message);
+}
+
+function readRowsFromSheet_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const headers = values[0].map(String);
+  return values.slice(1).filter((row) => row.some((cell) => cell !== "")).map((row) => {
+    const item = {};
+    headers.forEach((header, index) => { item[header] = formatCell(row[index], header); });
+    return item;
+  });
+}
+
 function readRows(buildingId, sheetName) {
   const sheet = openSpreadsheet(buildingId).getSheetByName(sheetName);
   if (!sheet) return [];
@@ -286,9 +684,11 @@ function readRows(buildingId, sheetName) {
 function appendRow(buildingId, sheetName, data) {
   const spreadsheet = openSpreadsheet(buildingId);
   const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
-  const headers = SHEET_HEADERS[sheetName];
-  if (sheet.getLastRow() === 0) sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  sheet.appendRow(headers.map((header) => data[header] || ""));
+  const targetHeaders = SHEET_HEADERS[sheetName];
+  if (!targetHeaders) throw appError("SCHEMA_ERROR", "Unbekannter Tab: " + sheetName);
+  if (sheet.getLastRow() === 0) sheet.getRange(1, 1, 1, targetHeaders.length).setValues([targetHeaders]);
+  const headers = readAndClassifyHeaders_(sheet, sheetName).headers;
+  sheet.appendRow(headers.map((header) => valueOrEmpty(data[header])));
 }
 
 function upsertSetting(buildingId, key, value) {
@@ -304,15 +704,24 @@ function upsertRow(sheetName, keyColumn, keyValue, data, buildingId) {
 }
 
 function getSettings(buildingId) {
-  return readRows(buildingId, "Settings")
-    .filter((row) => row.building_id === buildingId)
-    .reduce((settings, row) => {
-      settings[row.key] = row.value;
-      return settings;
-    }, {});
+  const settings = {};
+  readRows(buildingId, "Settings").filter((row) => row.building_id === buildingId).forEach((row) => {
+    if ((row.key === "public_show_booking_details" || row.key === "public_show_booking_titles" || row.key === MAINTENANCE_MARKER_KEY) && hasOwn(settings, row.key)) {
+      throw appError("SCHEMA_ERROR", "Settings enthält einen doppelten Sicherheits-Master.");
+    }
+    settings[row.key] = row.value;
+  });
+  return settings;
 }
 
-function publicOccupancyRow(row, showTitles) {
+function publicBookingDetailsEnabled(settings) {
+  if (hasOwn(settings, "public_show_booking_details")) return isTruthy(settings.public_show_booking_details);
+  return isTruthy(settings.public_show_booking_titles);
+}
+
+function publicOccupancyRow(row, showDetails) {
+  const publicTitle = normalizePublicMarkdown(row.public_title);
+  const publicOrganizer = normalizePublicMarkdown(row.public_organizer);
   return {
     date: row.date,
     from: normalizeTime(row.from),
@@ -320,7 +729,8 @@ function publicOccupancyRow(row, showTitles) {
     allDay: isAllDay(row.from, row.to),
     status: STATUS_LABELS[row.status] || row.status,
     statusKey: row.status,
-    publicTitle: showTitles ? sanitizeText(row.public_title || row.title || "", 140) : ""
+    publicTitle: showDetails && isTruthy(row.public_title_visible) && publicTitle.trim() ? publicTitle : "",
+    publicOrganizer: showDetails && isTruthy(row.public_organizer_visible) && publicOrganizer.trim() ? publicOrganizer : ""
   };
 }
 
@@ -368,11 +778,23 @@ function sanitizeText(value, maxLength) {
     .slice(0, maxLength);
 }
 
+function normalizePublicMarkdown(value) {
+  return String(valueOrEmpty(value))
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, "")
+    .slice(0, 1000);
+}
+
+function valueOrEmpty(value) {
+  return value === null || value === undefined ? "" : value;
+}
+
 function formatCell(value, header) {
   if (value instanceof Date && ["date", "valid_from", "valid_until"].includes(header)) return formatDate(value);
   if (value instanceof Date && ["from", "to"].includes(header)) return Utilities.formatDate(value, Session.getScriptTimeZone(), "HH:mm");
   if (value instanceof Date) return value.toISOString();
-  return String(value || "").trim();
+  if (typeof value === "boolean") return value;
+  return String(valueOrEmpty(value)).trim();
 }
 
 function formatDate(date) {
@@ -381,6 +803,10 @@ function formatDate(date) {
 
 function isTruthy(value) {
   return ["true", "ja", "1", "yes"].includes(String(value).toLowerCase());
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
 }
 
 function sortByDateAndTime(a, b) {

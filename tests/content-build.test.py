@@ -14,6 +14,10 @@ assert registry["areas"]["DGH"] == {"publicPath": "DGH", "buildingId": "dgh_rb"}
 assert registry["areas"]["EV_GEMEINDEHAUS"] == {"publicPath": "Gemeindehaus", "buildingId": "ev_gem_rb"}
 assert not list(SITE.rglob("*.odt"))
 assert not list((ROOT / "assets/data").glob("*.json")), "assets/data darf keine gepflegte Quelle sein"
+public_config_source = (ROOT / "betreiber/allgemein/konfiguration/frontend.json").read_text(encoding="utf-8")
+assert "publicShowBookingTitles" not in public_config_source, "Legacy-Sicherheitsfreigabe darf nicht in der öffentlichen Frontendkonfiguration stehen"
+assert "publicShowBookingDetails" not in public_config_source, "Sicherheitsfreigabe darf nicht in der öffentlichen Frontendkonfiguration stehen"
+required_frontend_assets = ("assets/js/frontend-core.js", "assets/js/restricted-markdown.js")
 for area, entry in registry["areas"].items():
     scope = SITE / entry["publicPath"]
     own = entry["buildingId"]
@@ -22,12 +26,24 @@ for area, entry in registry["areas"].items():
         payload = json.loads((scope / f"assets/data/{name}.json").read_text(encoding="utf-8"))
         assert all(item.get("buildingId") in ("*", own) for item in payload["items"])
         assert foreign not in json.dumps(payload)
+    rendered_config = (scope / "config/config.js").read_text(encoding="utf-8")
+    assert "publicShowBookingTitles" not in rendered_config
+    assert "publicShowBookingDetails" not in rendered_config
+    index_html = (scope / "index.html").read_text(encoding="utf-8")
+    for asset in required_frontend_assets:
+        assert (scope / asset).is_file(), f"{area}: erwartetes Frontend-Modul fehlt: {asset}"
+        assert f'<script src="{asset}"></script>' in index_html, f"{area}: Scriptreferenz fehlt: {asset}"
+    assert index_html.index("assets/js/frontend-core.js") < index_html.index("assets/js/restricted-markdown.js") < index_html.index("assets/js/ui.js") < index_html.index("assets/js/app.js")
 assert (SITE / "Gemeindehaus/downloads/Hausordnung.pdf").is_file()
 assert not (SITE / "DGH/downloads/Hausordnung.pdf").exists()
 root_config = (SITE / "config/config.js").read_text(encoding="utf-8")
 assert '"buildingId": "dgh_rb"' in root_config and "ev_gem_rb" not in root_config
 assert '"registerServiceWorker": false' in root_config
 assert not (SITE / "service-worker.js").exists()
+for asset in required_frontend_assets:
+    assert (SITE / asset).is_file(), f"Root: erwartetes Frontend-Modul fehlt: {asset}"
+root_index = (SITE / "index.html").read_text(encoding="utf-8")
+assert root_index.index("assets/js/frontend-core.js") < root_index.index("assets/js/restricted-markdown.js") < root_index.index("assets/js/ui.js") < root_index.index("assets/js/app.js")
 assert "{{" not in (SITE / "DGH/index.html").read_text(encoding="utf-8")
 assert "Datenschutz" in (SITE / "DGH/index.html").read_text(encoding="utf-8")
 

@@ -5,9 +5,61 @@
   const texts = config.texts || {};
   let currentOccupancyPayload = null;
   let currentOccupancyRange = null;
+  let currentOccupancyStale = false;
+  let occupancyRequestGeneration = 0;
+  let occupancyAbortController = null;
 
-  function occupancyCacheKey(range) {
+  function cacheKey(range) {
+    return window.FrontendCore.occupancyCacheKey(config.buildingId, range.from, range.to);
+  }
+
+  function legacyCacheKey(range) {
     return `occupancy:${config.buildingId}:${range.from}:${range.to}`;
+  }
+
+  function occupancyStorage() {
+    try { return window.localStorage; } catch (error) { return null; }
+  }
+
+  function removeOccupancyCache(range) {
+    const storage = occupancyStorage();
+    if (storage) window.FrontendCore.removeStorage(storage, cacheKey(range));
+  }
+
+  function readOccupancyCache(range) {
+    const storage = occupancyStorage();
+    if (!storage) return null;
+    window.FrontendCore.removeStorage(storage, legacyCacheKey(range));
+    const result = window.FrontendCore.readStorage(storage, cacheKey(range));
+    if (!result.ok || result.value === null) return null;
+    const parsed = window.FrontendCore.parseOccupancyCacheRecord(result.value);
+    if (parsed.state !== "fresh") {
+      removeOccupancyCache(range);
+      return null;
+    }
+    return parsed.payload;
+  }
+
+  function writeOccupancyCache(range, payload) {
+    const storage = occupancyStorage();
+    if (!storage) return;
+    const record = window.FrontendCore.createOccupancyCacheRecord(payload);
+    window.FrontendCore.writeStorage(storage, cacheKey(range), JSON.stringify(record));
+  }
+
+  async function fetchOccupancy(range, signal) {
+    if (!config.apiBaseUrl || config.apiBaseUrl.includes("DEPLOYMENT_" + "ID") || !config.buildingId) {
+      throw new Error("Bitte Apps-Script- und Gebäude-Konfiguration prüfen.");
+    }
+    const url = new URL(config.apiBaseUrl);
+    url.searchParams.set("action", "occupancy");
+    url.searchParams.set("buildingId", config.buildingId);
+    url.searchParams.set("from", range.from);
+    url.searchParams.set("to", range.to);
+    const response = await fetch(url, { method: "GET", signal });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.message || "Die Daten konnten nicht geladen werden.");
+    return payload.data;
   }
 
   function todayIso() {
@@ -48,12 +100,12 @@
     return select ? select.value : "plan";
   }
 
-  function renderOccupancy(payload, range) {
+  function renderOccupancy(payload, range, stale) {
     if (selectedView() === "plan") {
-      window.Ui.renderOccupancyPlan(payload.items || [], payload.loadedAt, false, range);
+      window.Ui.renderOccupancyPlan(payload.items || [], payload.loadedAt, stale, range);
       return;
     }
-    window.Ui.renderOccupancy(payload.items || [], payload.loadedAt, false);
+    window.Ui.renderOccupancy(payload.items || [], payload.loadedAt, stale);
   }
 
   function bookingItems(items) {
@@ -145,25 +197,30 @@
     const select = document.getElementById("occupancyRange");
     const meta = document.getElementById("occupancyMeta");
     const range = rangeFromSelection(select.value);
+    const storage = occupancyStorage();
+    if (storage) window.FrontendCore.removeStorage(storage, legacyCacheKey(range));
+    const generation = ++occupancyRequestGeneration;
+    if (occupancyAbortController) occupancyAbortController.abort();
+    occupancyAbortController = new AbortController();
+    const signal = occupancyAbortController.signal;
     try {
-      const data = await window.Api.getOccupancy(range.from, range.to);
-      const payload = { items: bookingItems(data.items), loadedAt: data.loadedAt || new Date().toISOString() };
+      const data = await fetchOccupancy(range, signal);
+      if (generation !== occupancyRequestGeneration || signal.aborted) return;
+      const payload = { ...data, items: window.FrontendCore.sortOccupancyItems(bookingItems(data.items)), loadedAt: data.loadedAt || new Date().toISOString() };
       currentOccupancyPayload = payload;
       currentOccupancyRange = range;
-      localStorage.setItem(occupancyCacheKey(range), JSON.stringify(payload));
-      renderOccupancy(payload, range);
+      currentOccupancyStale = false;
+      writeOccupancyCache(range, payload);
+      renderOccupancy(payload, range, currentOccupancyStale);
     } catch (error) {
-      const cached = localStorage.getItem(occupancyCacheKey(range));
+      if (generation !== occupancyRequestGeneration || error.name === "AbortError") return;
+      const cached = readOccupancyCache(range);
       if (cached) {
-        const payload = JSON.parse(cached);
-        payload.items = bookingItems(payload.items);
+        const payload = { ...cached, items: window.FrontendCore.sortOccupancyItems(bookingItems(cached.items)) };
         currentOccupancyPayload = payload;
         currentOccupancyRange = range;
-        if (selectedView() === "plan") {
-          window.Ui.renderOccupancyPlan(payload.items || [], payload.loadedAt || new Date().toISOString(), true, range);
-        } else {
-          window.Ui.renderOccupancy(payload.items || [], payload.loadedAt || new Date().toISOString(), true);
-        }
+        currentOccupancyStale = true;
+        renderOccupancy(payload, range, currentOccupancyStale);
         meta.textContent += ` · ${texts.occupancyLoadFailed} ${error.message}`;
       } else {
         meta.textContent = `${texts.occupancyLoadFailed} ${error.message}`;
@@ -236,11 +293,18 @@
 
     document.getElementById("occupancyView").addEventListener("change", () => {
       if (currentOccupancyPayload && currentOccupancyRange) {
-        renderOccupancy(currentOccupancyPayload, currentOccupancyRange);
+        renderOccupancy(currentOccupancyPayload, currentOccupancyRange, currentOccupancyStale);
       }
     });
 
     document.getElementById("occupancyList").addEventListener("click", async (event) => {
+      const detailButton = event.target.closest("[data-occupancy-date]");
+      if (detailButton && currentOccupancyPayload) {
+        const date = detailButton.dataset.occupancyDate;
+        const items = (currentOccupancyPayload.items || []).filter((item) => item.date === date);
+        window.Ui.openBookingDetailsDialog(date, items, detailButton);
+        return;
+      }
       const dayButton = event.target.closest("[data-booking-date]");
       if (dayButton) {
         prefillBookingRequest(dayButton.dataset.bookingDate);
@@ -346,6 +410,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     window.Ui.applyConfig(config);
     window.Ui.setConnectionStatus();
+    window.Ui.bindBookingDialog();
     bindForms();
     bindAllDay();
     loadBuilding();

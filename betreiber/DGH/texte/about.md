@@ -6,8 +6,10 @@ Das Dorfgemeinschaftshaus in Rinderbügen gehört der Stadt Büdingen. Im Rahmen
 
 Eine Vermietung gilt erst dann als verbindlich bestätigt, wenn ein offizieller Mietvertrag abgeschlossen wurde. Dies erfolgt bis auf Weiteres weiterhin offline mit Papier und Stift. Erst danach wird die entsprechende Belegung auf dieser Seite angezeigt.
 
-Auskünfte über Mieterinnen und Mieter werden auf dieser Seite grundsätzlich nicht erteilt. Angezeigt wird lediglich, ob das Dorfgemeinschaftshaus belegt ist. Belegt ist belegt. Termine mit Teilbelegungen sind daher immer direkt mit Monika Heß abzustimmen.
+Auskünfte über Mieterinnen und Mieter werden auf dieser Seite grundsätzlich nicht erteilt. Öffentlich erscheinen Datum, Zeit und Status einer Belegung sowie ausschließlich Veranstaltungstitel und Veranstalter, die der Betreiber ausdrücklich freigegeben hat. Namen, Kontaktdaten und Texte aus Buchungsanfragen werden nicht automatisch veröffentlicht. Termine mit Teilbelegungen sind daher immer direkt mit Monika Heß abzustimmen.
+
+Ein Betreiber kann bewusst einen Personennamen oder einen `mailto:`-Link als öffentlichen Veranstalter freigeben. Damit wird diese Angabe öffentlich sichtbar. Bereits abgerufene freigegebene Details können nach einer späteren Deaktivierung auf demselben Gerät bei fehlender Netzverbindung noch bis zum Ablauf von 24 Stunden sichtbar bleiben.
 
 Für regelmäßige Treffen im Dorfgemeinschaftshaus gilt, dass bereits vorgesehene Belegungen unter bestimmten Umständen zugunsten einer Vermietung geändert werden können. Dies ist jedoch stets eine Frage der individuellen Abstimmung und kann über diese Plattform nicht verbindlich geklärt werden.
 
-Dieses System kann rückwirkend keine Informationen über frühere Belegungen liefern. Sämtliche Belegungsdaten werden am Tag nach der jeweiligen Nutzung vollständig gelöscht.
+Vergangene Belegungen werden über die öffentliche API nicht angezeigt. Interne Aufbewahrung und Löschung erfolgen nach dem Prozess des jeweiligen Betreibers.
