@@ -1,7 +1,10 @@
-const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
-const vm = require("node:vm");
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import vm from "node:vm";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const source = fs.readFileSync(path.join(__dirname, "..", "_site", "DGH", "service-worker.js"), "utf8");
 
@@ -19,9 +22,11 @@ function worker(scope, options = {}) {
   const entries = new Map(Object.entries(options.entries || {}));
   const cache = {
     async put(request, response) {
+      if (options.putError) throw options.putError;
       entries.set(requestKey(request), response.clone());
     },
     async match(request) {
+      if (options.matchError) throw options.matchError;
       const response = entries.get(requestKey(request));
       return response && response.clone();
     },
@@ -44,13 +49,17 @@ function worker(scope, options = {}) {
     URL,
     Request,
     Response,
-    console,
+    console: options.console || console,
     fetch: async (request) => {
       fetchCalls.push(requestKey(request));
       return fetchImpl(request);
     },
     caches: {
-      async open(name) { opened.push(name); return cache; },
+      async open(name) {
+        opened.push(name);
+        if (options.openError) throw options.openError;
+        return cache;
+      },
       async keys() { return options.cacheNames || []; },
       async delete(name) { deleted.push(name); return true; },
     },
@@ -105,7 +114,7 @@ function getRequest(url, overrides = {}) {
   assert.deepEqual(activation.deleted, [oldDghCache]);
   assert.equal(activation.lifecycle.claimed, true, "Activate muss clients.claim abwarten");
 
-  const scriptUrl = `${dghScope}assets/js/app.js`;
+  const scriptUrl = `${dghScope}assets/js/main.js`;
   const networkUpdate = worker(dghScope, {
     entries: { [scriptUrl]: new Response("old") },
     fetch: async () => new Response("new", { status: 200 }),
@@ -120,6 +129,79 @@ function getRequest(url, overrides = {}) {
   });
   const fallback = await dispatchFetch(networkFailure.handlers.fetch, getRequest(scriptUrl, { destination: "script" }));
   assert.equal(await fallback.response.text(), "cached", "Netzfehler muss Cache verwenden");
+
+  const failedNetworkWrite = worker(dghScope, {
+    entries: { [scriptUrl]: new Response("old") },
+    fetch: async () => new Response("fresh", { status: 200 }),
+    putError: new Error("quota"),
+    console: { warn() {} },
+  });
+  const freshDespiteWriteError = await dispatchFetch(failedNetworkWrite.handlers.fetch, getRequest(scriptUrl, { destination: "script" }));
+  assert.equal(await freshDespiteWriteError.response.text(), "fresh", "Cache-Fehler darf frische Netzantwort nicht verwerfen");
+
+  const imageUrl = `${dghScope}assets/icons/new.png`;
+  const failedBinaryWrite = worker(dghScope, {
+    fetch: async () => new Response("fresh binary", { status: 200 }),
+    putError: new Error("quota"),
+    console: { warn() {} },
+  });
+  const freshBinary = await dispatchFetch(failedBinaryWrite.handlers.fetch, getRequest(imageUrl, { destination: "image" }));
+  assert.equal(await freshBinary.response.text(), "fresh binary", "Cache-First muss Netzantwort trotz Cache-Fehler liefern");
+
+  const failedPrecacheWrites = worker(dghScope, {
+    putError: new Error("quota"),
+    console: { warn() {} },
+  });
+  await assert.rejects(dispatchLifecycle(failedPrecacheWrites.handlers.install), /quota/, "Precache-Schreibfehler muss Installation abbrechen");
+
+  const failedPrecacheFetch = worker(dghScope, {
+    fetch: async () => new Response("Fehlt", { status: 404 }),
+  });
+  await assert.rejects(dispatchLifecycle(failedPrecacheFetch.handlers.install), /Precache fehlgeschlagen/, "Pflichtasset-Fehler muss Installation abbrechen");
+
+  const rejectedPrecacheFetch = worker(dghScope, {
+    fetch: async () => { throw new TypeError("Pflichtasset offline"); },
+  });
+  await assert.rejects(dispatchLifecycle(rejectedPrecacheFetch.handlers.install), /Pflichtasset offline/, "Pflichtasset-Netzfehler muss Installation abbrechen");
+
+  const failedPrecacheOpen = worker(dghScope, { openError: new Error("CacheStorage gesperrt") });
+  await assert.rejects(dispatchLifecycle(failedPrecacheOpen.handlers.install), /CacheStorage gesperrt/, "Fehlender Install-Cache muss Installation abbrechen");
+
+  const uncacheablePrecache = worker(dghScope, {
+    fetch: async () => new Response("Privat", { status: 200, headers: { "Cache-Control": "no-store" } }),
+  });
+  await assert.rejects(dispatchLifecycle(uncacheablePrecache.handlers.install), /nicht cachebar/, "Nicht cachebare Pflichtassets müssen Installation abbrechen");
+
+  for (const [assetUrl, destination] of [[scriptUrl, "script"], [imageUrl, "image"]]) {
+    const unavailableCache = worker(dghScope, {
+      openError: new Error("CacheStorage gesperrt"),
+      fetch: async () => new Response("network without cache", { status: 200 }),
+      console: { warn() {} },
+    });
+    const result = await dispatchFetch(unavailableCache.handlers.fetch, getRequest(assetUrl, { destination }));
+    assert.equal(await result.response.text(), "network without cache", `${destination}: CacheStorage-Fehler darf Onlineantwort nicht blockieren`);
+  }
+
+  const unreadableBinaryCache = worker(dghScope, {
+    matchError: new Error("Cache-Lesen gesperrt"),
+    fetch: async () => new Response("network after match error", { status: 200 }),
+    console: { warn() {} },
+  });
+  const afterMatchError = await dispatchFetch(unreadableBinaryCache.handlers.fetch, getRequest(imageUrl, { destination: "image" }));
+  assert.equal(await afterMatchError.response.text(), "network after match error");
+
+  for (const destination of ["script", "image"]) {
+    const offlineWithoutCache = worker(dghScope, {
+      openError: new Error("CacheStorage gesperrt"),
+      fetch: async () => { throw new TypeError("offline ohne Cache"); },
+      console: { warn() {} },
+    });
+    await assert.rejects(
+      dispatchFetch(offlineWithoutCache.handlers.fetch, getRequest(destination === "image" ? imageUrl : scriptUrl, { destination })),
+      /offline ohne Cache/,
+      `${destination}: Netzfehler ohne Cache muss geworfen werden`,
+    );
+  }
 
   const indexUrl = `${dghScope}index.html`;
   const navigation = worker(dghScope, {
@@ -150,7 +232,7 @@ function getRequest(url, overrides = {}) {
 
   for (const request of [
     getRequest("https://script.google.com/macros/s/test/exec"),
-    getRequest(`${gemeindehausScope}assets/js/app.js`, { destination: "script" }),
+    getRequest(`${gemeindehausScope}assets/js/features/occupancy/controller.js`, { destination: "script" }),
     getRequest(scriptUrl, { method: "POST" }),
   ]) {
     const isolated = await dispatchFetch(dgh.handlers.fetch, request);

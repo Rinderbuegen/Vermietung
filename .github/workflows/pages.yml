@@ -25,18 +25,47 @@ jobs:
       - run: python scripts/build-pages-site.py
       - run: python scripts/verify-pages-site.py
       - run: python tests/content-build.test.py
+      - run: python tests/frontend-modules.test.py
       - run: python tests/configure-runtime.test.py
+      - run: npm test
       - run: node tests/apps-script.test.js
-      - run: node tests/restricted-markdown.test.js
-      - run: node tests/frontend-core.test.js
       - run: node tests/service-worker.test.js
+
+  browser:
+    name: Browser (${{ matrix.browser }})
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python scripts/build-pages-site.py
+      - run: python -m pip install playwright==1.61.0
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: python tests/browser.test.py --browser ${{ matrix.browser }}
+
+  pwa-offline:
+    name: PWA Offline (Chromium)
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python scripts/build-pages-site.py
       - run: python -m pip install playwright==1.61.0
       - run: python -m playwright install --with-deps chromium
-      - run: python tests/browser.test.py
+      - run: python tests/pwa-browser.test.py
 
   deploy:
     name: Pages Bereitstellung
-    needs: quality
+    needs: [quality, browser, pwa-offline]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

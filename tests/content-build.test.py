@@ -3,10 +3,15 @@
 
 import json
 import importlib.util
+import re
+import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.verify_frontend_modules import module_graph
+
 SITE = ROOT / "_site"
 registry = json.loads((ROOT / "betreiber/allgemein/konfiguration/registry.json").read_text(encoding="utf-8"))
 assert set(registry["areas"]) == {"DGH", "EV_GEMEINDEHAUS"}
@@ -17,7 +22,7 @@ assert not list((ROOT / "assets/data").glob("*.json")), "assets/data darf keine 
 public_config_source = (ROOT / "betreiber/allgemein/konfiguration/frontend.json").read_text(encoding="utf-8")
 assert "publicShowBookingTitles" not in public_config_source, "Legacy-Sicherheitsfreigabe darf nicht in der öffentlichen Frontendkonfiguration stehen"
 assert "publicShowBookingDetails" not in public_config_source, "Sicherheitsfreigabe darf nicht in der öffentlichen Frontendkonfiguration stehen"
-required_frontend_assets = ("assets/js/frontend-core.js", "assets/js/restricted-markdown.js")
+scope_graphs = []
 for area, entry in registry["areas"].items():
     scope = SITE / entry["publicPath"]
     own = entry["buildingId"]
@@ -30,20 +35,26 @@ for area, entry in registry["areas"].items():
     assert "publicShowBookingTitles" not in rendered_config
     assert "publicShowBookingDetails" not in rendered_config
     index_html = (scope / "index.html").read_text(encoding="utf-8")
-    for asset in required_frontend_assets:
-        assert (scope / asset).is_file(), f"{area}: erwartetes Frontend-Modul fehlt: {asset}"
-        assert f'<script src="{asset}"></script>' in index_html, f"{area}: Scriptreferenz fehlt: {asset}"
-    assert index_html.index("assets/js/frontend-core.js") < index_html.index("assets/js/restricted-markdown.js") < index_html.index("assets/js/ui.js") < index_html.index("assets/js/app.js")
+    assert index_html.count('type="module"') == 1
+    assert '<script type="module" src="assets/js/main.js"></script>' in index_html
+    assert '<script src="config/config.js"></script>' in index_html
+    frontend_scripts = re.findall(r'<script\b[^>]*\bsrc=["\'](assets/js/[^"\']+)["\']', index_html)
+    assert frontend_scripts == ["assets/js/main.js"], f"{area}: unerwartete Frontend-Script-Tags: {frontend_scripts}"
+    graph = module_graph(scope / "assets/js")
+    scope_graphs.append(graph)
+    worker = (scope / "service-worker.js").read_text(encoding="utf-8")
+    precache = set(json.loads(re.search(r"const STATIC_ASSETS = (\[.*?\]);", worker, re.S).group(1)))
+    assert all(f"./assets/js/{module.as_posix()}" in precache for module in graph), f"{area}: Graphmodule fehlen im Precache"
+assert scope_graphs[0] == scope_graphs[1], "Gebäudescopes müssen denselben Frontend-Graphen ausliefern"
 assert (SITE / "Gemeindehaus/downloads/Hausordnung.pdf").is_file()
 assert not (SITE / "DGH/downloads/Hausordnung.pdf").exists()
 root_config = (SITE / "config/config.js").read_text(encoding="utf-8")
 assert '"buildingId": "dgh_rb"' in root_config and "ev_gem_rb" not in root_config
 assert '"registerServiceWorker": false' in root_config
 assert not (SITE / "service-worker.js").exists()
-for asset in required_frontend_assets:
-    assert (SITE / asset).is_file(), f"Root: erwartetes Frontend-Modul fehlt: {asset}"
 root_index = (SITE / "index.html").read_text(encoding="utf-8")
-assert root_index.index("assets/js/frontend-core.js") < root_index.index("assets/js/restricted-markdown.js") < root_index.index("assets/js/ui.js") < root_index.index("assets/js/app.js")
+assert '<script type="module" src="assets/js/main.js"></script>' in root_index
+assert module_graph(SITE / "assets/js") == scope_graphs[0]
 assert "{{" not in (SITE / "DGH/index.html").read_text(encoding="utf-8")
 assert "Datenschutz" in (SITE / "DGH/index.html").read_text(encoding="utf-8")
 

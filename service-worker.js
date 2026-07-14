@@ -12,8 +12,29 @@ function isCacheableResponse(response) {
   return !/\bno-store\b/i.test(cacheControl) && response.headers.get("Vary") !== "*";
 }
 
-async function store(cache, request, response) {
-  if (isCacheableResponse(response)) await cache.put(request, response.clone());
+async function storeRuntime(cache, request, response) {
+  if (!isCacheableResponse(response)) return;
+  try {
+    await cache.put(request, response.clone());
+  } catch (error) {
+    console.warn("Cache konnte nicht aktualisiert werden:", request.url || request, error);
+  }
+}
+
+async function precache(cache, request, response) {
+  if (!isCacheableResponse(response)) {
+    throw new Error(`Precache-Antwort nicht cachebar: ${request.url} (${response ? response.status : "keine Antwort"})`);
+  }
+  await cache.put(request, response.clone());
+}
+
+async function openRuntimeCache() {
+  try {
+    return await caches.open(CACHE_NAME);
+  } catch (error) {
+    console.warn("Runtime-Cache nicht verfügbar:", error);
+    return null;
+  }
 }
 
 self.addEventListener("install", (event) => {
@@ -23,7 +44,7 @@ self.addEventListener("install", (event) => {
       const request = new Request(new URL(asset, SCOPE_URL));
       const response = await fetch(request);
       if (!response.ok) throw new Error(`Precache fehlgeschlagen: ${request.url} (${response.status})`);
-      await store(cache, request, response);
+      await precache(cache, request, response);
     }));
   })());
 });
@@ -41,28 +62,41 @@ function isBinaryAsset(request, url) {
 }
 
 async function networkFirst(request, isNavigation) {
-  const cache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request);
-    await store(cache, request, response);
+    const cache = await openRuntimeCache();
+    if (cache) await storeRuntime(cache, request, response);
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    if (isNavigation) {
-      const index = await cache.match(new URL("index.html", SCOPE_URL));
-      if (index) return index;
+    const cache = await openRuntimeCache();
+    if (cache) {
+      try {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        if (isNavigation) {
+          const index = await cache.match(new URL("index.html", SCOPE_URL));
+          if (index) return index;
+        }
+      } catch (cacheError) {
+        console.warn("Runtime-Cache konnte nicht gelesen werden:", cacheError);
+      }
     }
     throw error;
   }
 }
 
 async function cacheFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cached = await cache.match(request);
-  if (cached) return cached;
+  const cache = await openRuntimeCache();
+  if (cache) {
+    try {
+      const cached = await cache.match(request);
+      if (cached) return cached;
+    } catch (error) {
+      console.warn("Runtime-Cache konnte nicht gelesen werden:", error);
+    }
+  }
   const response = await fetch(request);
-  await store(cache, request, response);
+  if (cache) await storeRuntime(cache, request, response);
   return response;
 }
 

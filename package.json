@@ -1,0 +1,12 @@
+{
+  "name": "vermietung-frontend-core",
+  "version": "1.5.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test tests/date-range.test.js tests/occupancy.test.js tests/occupancy-view.test.js tests/occupancy-cache.test.js tests/apps-script-client.test.js tests/content-repository.test.js tests/restricted-markdown.test.js tests/request-forms.test.js"
+  }
+}

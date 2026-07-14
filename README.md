@@ -1,6 +1,6 @@
 # Gebäudevermietung PWA
 
-Version 1.4.4. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
+Version 1.5.0. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
 
 ## Öffentliche URLs und IDs
 
@@ -19,6 +19,14 @@ Build-Regel: `allgemein` wird zuerst geladen. Das gewählte Gebäude überschrei
 
 `assets/data/*.json`, Manifest, Laufzeitkonfiguration und Service Worker sind reine Buildprodukte in `_site`.
 
+## Frontend-Architektur
+
+Das Frontend läuft ohne Bundler als nativer Browser-ESM-Graph. `assets/js/main.js` ist der Composition Root und verdrahtet die Module aus `config`, `domain`, `infrastructure`, `features`, `shared` und `pwa`. Abhängigkeiten werden über statische ESM-Imports und Fabrikparameter aufgelöst; einzig `window.APP_CONFIG` bleibt als globale Laufzeitübergabe bestehen.
+
+`config/config.js` wird weiterhin als klassisches Skript vor dem Moduleinstieg geladen. Auch der scope-eigene `service-worker.js` bleibt ein klassischer Worker. Der Belegungs-Offlinecache verwendet das Präfix `occupancy:v3` und speichert nach Normalisierung nur die öffentlichen Felder `date`, `from`, `to`, `allDay`, `status`, `statusKey`, `publicTitle` und `publicOrganizer`.
+
+Der Architekturwechsel in 1.5.0 enthält bewusst keine Legacy-Skriptkompatibilität für bereits installierte ältere PWA-Versionen. Zur Aktualisierung die installierte PWA einmal online öffnen, alle alten PWA-Fenster und Browser-Tabs schließen und anschließend neu öffnen, damit der neue Service Worker aktiviert und der ESM-Stand vollständig geladen wird.
+
 ## Build und Prüfung
 
 ```pwsh
@@ -26,13 +34,25 @@ python scripts/build-apps-script.py
 python scripts/build-pages-site.py
 python scripts/verify-pages-site.py
 python tests/content-build.test.py
+python tests/frontend-modules.test.py
 python tests/configure-runtime.test.py
+npm test
 node tests/apps-script.test.js
-node tests/restricted-markdown.test.js
-node tests/frontend-core.test.js
 node tests/service-worker.test.js
-python tests/browser.test.py
+python tests/browser.test.py --browser chromium
+python tests/browser.test.py --browser firefox
+python tests/browser.test.py --browser webkit
+python tests/pwa-browser.test.py
 ```
+
+Playwright einmalig für die Browsermatrix installieren:
+
+```pwsh
+python -m pip install playwright==1.61.0
+python -m playwright install chromium firefox webkit
+```
+
+`tests/browser.test.py` prüft die Funktionsmatrix getrennt mit Chromium, Firefox und WebKit. `tests/pwa-browser.test.py` ist ein zusätzlicher Chromium-Test mit echten Service Workern für Offline-Neuladen und Scope-Isolation.
 
 Für eine konfigurierte Schnell-Demo zusätzlich:
 
@@ -43,7 +63,7 @@ tools\demo-server.cmd
 
 URLs: `https://localhost:8443/Vermietung/DGH/` und `https://localhost:8443/Vermietung/Gemeindehaus/`.
 
-Die Demo prüft lokale Buildpfade, HTTPS und PWA-Verhalten, ersetzt aber weder die vollständige Qualitätsmatrix oben noch Staging- und Live-Prüfungen. Für `tests/browser.test.py` einmalig `python -m pip install playwright==1.61.0` und `python -m playwright install chromium` ausführen.
+Die Demo prüft lokale Buildpfade, HTTPS und PWA-Verhalten, ersetzt aber weder die vollständige Qualitätsmatrix oben noch Staging- und Live-Prüfungen.
 
 ## Apps Script und Deployment
 

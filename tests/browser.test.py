@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import threading
@@ -102,7 +103,12 @@ def install_routes(context, origin: str, online: dict[str, bool], request_count:
                 return
             building_id = query.get("buildingId", [""])[0]
             if action == "occupancy":
-                data = {"schemaVersion": 2, "loadedAt": "2026-07-14T10:15:00.000Z", "items": occupancy(building_id, query.get("to", [""])[0])}
+                data = {
+                    "schemaVersion": 2,
+                    "loadedAt": "2026-07-14T10:15:00.000Z",
+                    "items": occupancy(building_id, query.get("to", [""])[0]),
+                    "privateEnvelopeField": "DARF-NIE-GECACHT-WERDEN",
+                }
             elif action == "building":
                 response_public_note = BUILDING_PUBLIC_NOTES[building_id] if api_public_note is None else api_public_note
                 data = {"name": building_id, "operatorName": "Test", "contactEmail": "test@example.org", "publicNote": response_public_note}
@@ -143,43 +149,34 @@ def assert_public_note_regression(browser, origin: str) -> None:
         try:
             context.add_init_script("""
               (() => {
-                let releaseBuildingGate;
-                const buildingGate = new Promise((resolve) => { releaseBuildingGate = resolve; });
+                let releaseBuildingResponse;
+                const buildingResponseGate = new Promise((resolve) => { releaseBuildingResponse = resolve; });
                 window.__buildingResponseReceived = false;
-                window.__buildingProcessingComplete = false;
-                window.__releaseBuildingGate = () => releaseBuildingGate();
+                window.__releaseBuildingResponse = () => releaseBuildingResponse();
                 const nativeFetch = window.fetch.bind(window);
                 window.fetch = async (input, options) => {
                   const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url, window.location.href);
                   if (url.searchParams.get("action") !== "building") return nativeFetch(input, options);
                   const response = await nativeFetch(input, options);
                   window.__buildingResponseReceived = true;
-                  await buildingGate;
+                  await buildingResponseGate;
                   return response;
                 };
-                document.addEventListener("DOMContentLoaded", () => {
-                  const applyConfig = window.Ui.applyConfig;
-                  window.Ui.applyConfig = (...args) => {
-                    const result = applyConfig(...args);
-                    if (window.__buildingResponseReceived) window.__buildingProcessingComplete = true;
-                    return result;
-                  };
-                }, { once: true });
               })();
             """)
             install_routes(context, origin, online, request_count, frontend_note, api_public_note)
             page = context.new_page()
             page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
             page.on("pageerror", lambda error: errors.append(str(error)))
-            page.goto(f"{origin}/{scope}/", wait_until="domcontentloaded")
+            with page.expect_response(lambda response: urlparse(response.url).path == "/exec" and parse_qs(urlparse(response.url).query).get("action") == ["building"]):
+                page.goto(f"{origin}/{scope}/", wait_until="domcontentloaded")
             page.wait_for_function("window.__buildingResponseReceived === true")
-
             note = page.locator("[data-public-note]")
             assert page.evaluate("window.APP_CONFIG.texts.publicNote") == frontend_note
-            assert note.text_content() == frontend_note
-
-            page.evaluate("window.__releaseBuildingGate()")
-            page.wait_for_function("window.__buildingProcessingComplete === true")
+            assert note.text_content() == frontend_note.strip()
+            page.evaluate("window.__releaseBuildingResponse()")
+            page.wait_for_load_state("networkidle")
+            page.wait_for_function("expected => document.querySelector('[data-public-note]').textContent === expected", arg=expected_note)
             assert note.text_content() == expected_note
             assert not errors, f"Browser-Fehler in {scope} mit Hinweis {frontend_note!r}: " + " | ".join(errors)
         finally:
@@ -187,13 +184,16 @@ def assert_public_note_regression(browser, origin: str) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Browser-Regressionsprüfung")
+    parser.add_argument("--browser", choices=("chromium", "firefox", "webkit"), default="chromium")
+    args = parser.parse_args()
     if not SITE.is_dir():
         raise SystemExit("_site fehlt. Zuerst python scripts/build-pages-site.py ausführen.")
     errors: list[str] = []
     online = {"value": True}
     request_count = {"occupancy": 0}
     with local_server() as origin, sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
+        browser = getattr(playwright, args.browser).launch(headless=True)
         assert_public_note_regression(browser, origin)
         context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
         context.add_init_script(f"""
@@ -267,20 +267,19 @@ def main() -> None:
         assert dialog.locator("script, img, svg, [onerror]").count() == 0
         assert dialog.locator(".status-label").count() == 0
         page.keyboard.press("Escape")
-        assert page.locator("#bookingDetailsDialog").evaluate("node => !node.open")
-        page.wait_for_timeout(10)
-        assert page.evaluate("document.activeElement.dataset.occupancyDate") == "2026-07-18"
+        page.wait_for_function("!document.getElementById('bookingDetailsDialog').open")
+        page.wait_for_function("document.activeElement.dataset.occupancyDate === '2026-07-18'")
 
         trigger.focus()
         page.keyboard.press("Enter")
         assert dialog.evaluate("node => node.open")
         page.get_by_role("button", name="Schließen").click()
-        page.wait_for_timeout(10)
-        assert page.evaluate("document.activeElement.dataset.occupancyDate") == "2026-07-18"
+        page.wait_for_function("document.activeElement.dataset.occupancyDate === '2026-07-18'")
         trigger.focus()
         page.keyboard.press(" ")
         assert dialog.evaluate("node => node.open")
         page.keyboard.press("Escape")
+        page.wait_for_function("!document.getElementById('bookingDetailsDialog').open")
 
         before_view_change = request_count["occupancy"]
         page.locator("#occupancyView").select_option("table")
@@ -300,9 +299,11 @@ def main() -> None:
         page.locator("[data-occupancy-date='2026-07-20']").click()
         assert dialog.locator(".status-label").inner_text() == "gesperrt"
         page.keyboard.press("Escape")
+        page.wait_for_function("!document.getElementById('bookingDetailsDialog').open")
         page.locator("[data-occupancy-date='2026-07-23']").click()
         assert dialog.locator(".status-label").inner_text() == "Status unbekannt"
         page.keyboard.press("Escape")
+        page.wait_for_function("!document.getElementById('bookingDetailsDialog').open")
         page.locator("#occupancyView").select_option("table")
 
         page.evaluate("window.__createOccupancyGate('2026-07-14:2026-07-31')")
@@ -400,10 +401,10 @@ def main() -> None:
 
         before_error_range = request_count["occupancy"]
         page.evaluate("""() => {
-          window.__createOccupancyGate('2026-08-01:2026-08-31');
+          window.__createOccupancyGate('2028-08-01:2028-08-31');
           const select = document.getElementById('occupancyRange');
-          select.dataset.from = '2026-08-01';
-          select.dataset.to = '2026-08-31';
+          select.dataset.from = '2028-08-01';
+          select.dataset.to = '2028-08-31';
           select.value = 'selected-month';
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }""")
@@ -413,7 +414,7 @@ def main() -> None:
         page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
         assert page.locator("#occupancyPrint").inner_text() == ""
         online["value"] = False
-        page.evaluate("window.__online = false; window.__releaseOccupancyGate('2026-08-01:2026-08-31')")
+        page.evaluate("window.__online = false; window.__releaseOccupancyGate('2028-08-01:2028-08-31')")
         page.wait_for_function("document.getElementById('occupancyList').getAttribute('aria-busy') === 'false'")
         assert "Die Belegung konnte nicht geladen werden" in page.locator("#occupancyMeta").inner_text()
         assert page.locator("#occupancyPrint").inner_text() == ""
@@ -429,6 +430,10 @@ def main() -> None:
           put('occupancy:v2:dgh_rb:expired', JSON.stringify({ cachedAt: 0, payload: { items: [] } }));
           put('occupancy:v2:dgh_rb:fresh', JSON.stringify({ cachedAt: 1784024100000, payload: { items: [] } }));
           put('occupancy:v2:ev_gem_rb:bad', '{');
+          put('occupancy:v3:dgh_rb:bad', '{');
+          put('occupancy:v3:dgh_rb:expired', JSON.stringify({ cachedAt: 0, payload: { schemaVersion: 2, items: [] } }));
+          put('occupancy:v3:dgh_rb:fresh', JSON.stringify({ cachedAt: 1784024100000, payload: { schemaVersion: 2, items: [] } }));
+          put('occupancy:v3:ev_gem_rb:bad', '{');
           put('foreign:cache', 'unchanged');
           put('occupancy:dgh_rb:2027-01-01:2027-12-31', 'legacy');
         }""")
@@ -437,10 +442,26 @@ def main() -> None:
         keys = page.evaluate("Object.keys(localStorage).sort()")
         assert "occupancy:v2:dgh_rb:bad" not in keys
         assert "occupancy:v2:dgh_rb:expired" not in keys
-        assert "occupancy:v2:dgh_rb:fresh" in keys
+        assert "occupancy:v2:dgh_rb:fresh" not in keys
         assert page.evaluate("localStorage.getItem('occupancy:v2:ev_gem_rb:bad')") == "{"
+        assert "occupancy:v3:dgh_rb:bad" not in keys
+        assert "occupancy:v3:dgh_rb:expired" not in keys
+        assert "occupancy:v3:dgh_rb:fresh" in keys
+        assert page.evaluate("localStorage.getItem('occupancy:v3:ev_gem_rb:bad')") == "{"
         assert page.evaluate("localStorage.getItem('foreign:cache')") == "unchanged"
         assert "occupancy:dgh_rb:2027-01-01:2027-12-31" not in keys
+        dgh_cache_records = page.evaluate("""() => Object.entries(localStorage)
+          .filter(([key]) => key.startsWith('occupancy:v3:dgh_rb:'))
+          .map(([key, value]) => [key, JSON.parse(value)])""")
+        public_fields = sorted(["date", "from", "to", "allDay", "status", "statusKey", "publicTitle", "publicOrganizer"])
+        cached_items = [item for _, record in dgh_cache_records for item in record["payload"]["items"]]
+        assert cached_items, "Mindestens ein API-Eintrag muss im v3-Cache geprüft werden"
+        assert all(sorted(item) == public_fields for item in cached_items)
+        serialized_cache = json.dumps(dgh_cache_records, ensure_ascii=False)
+        assert "privateNote" not in serialized_cache
+        assert "DARF-NIE-GEDRUCKT-WERDEN" not in serialized_cache
+        assert "privateEnvelopeField" not in serialized_cache
+        assert "DARF-NIE-GECACHT-WERDEN" not in serialized_cache
         assert all(entry["cache"] == "no-store" for entry in page.evaluate("window.__occupancyFetches"))
 
         page.goto(f"{origin}/Gemeindehaus/", wait_until="networkidle")
@@ -459,8 +480,8 @@ def main() -> None:
         assert request_count["occupancy"] == before_gemeindehaus_print
         assert all(entry["cache"] == "no-store" for entry in page.evaluate("window.__occupancyFetches"))
         keys = page.evaluate("Object.keys(localStorage).sort()")
-        assert any(key.startswith("occupancy:v2:dgh_rb:") for key in keys)
-        assert any(key.startswith("occupancy:v2:ev_gem_rb:") for key in keys)
+        assert any(key.startswith("occupancy:v3:dgh_rb:") for key in keys)
+        assert any(key.startswith("occupancy:v3:ev_gem_rb:") for key in keys)
         browser.close()
     assert not errors, "Browser errors: " + " | ".join(errors)
     print("browser tests passed")

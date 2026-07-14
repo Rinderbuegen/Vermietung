@@ -108,20 +108,25 @@ python scripts/build-apps-script.py
 python scripts/build-pages-site.py
 python scripts/verify-pages-site.py
 python tests/content-build.test.py
+python tests/frontend-modules.test.py
 python tests/configure-runtime.test.py
+npm test
 node tests/apps-script.test.js
-node tests/restricted-markdown.test.js
-node tests/frontend-core.test.js
 node tests/service-worker.test.js
-python tests/browser.test.py
+python tests/browser.test.py --browser chromium
+python tests/browser.test.py --browser firefox
+python tests/browser.test.py --browser webkit
+python tests/pwa-browser.test.py
 ```
 
-Für den Browser-Test einmalig:
+Für die Browsermatrix einmalig:
 
 ```pwsh
 python -m pip install playwright==1.61.0
-python -m playwright install chromium
+python -m playwright install chromium firefox webkit
 ```
+
+`tests/browser.test.py` prüft Chromium, Firefox und WebKit getrennt. `tests/pwa-browser.test.py` prüft zusätzlich mit Chromium echte Service Worker, Offline-Neuladen und Scope-Isolation.
 
 ## Benötigte Berechtigungen
 

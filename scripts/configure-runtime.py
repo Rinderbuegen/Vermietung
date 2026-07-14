@@ -8,24 +8,21 @@ import re
 import hashlib
 import json
 from pathlib import Path
-from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_FILE = ROOT / "betreiber" / "allgemein" / "konfiguration" / "frontend.json"
 PLACEHOLDER_URL = "https://script.google.com/macros/s/DEPLOYMENT_ID/exec"
-API_BASE_URL_PATTERN = re.compile(r'((?:["\']apiBaseUrl["\']|apiBaseUrl)\s*:\s*["\'])[^"\']+(["\'])')
+APPS_SCRIPT_URL_PATTERN = re.compile(r"https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec")
+API_BASE_URL_PATTERN = re.compile(r'((?:["\']apiBaseUrl["\']|apiBaseUrl)\s*:\s*)["\'][^"\']*["\']')
 STATIC_ASSETS_PATTERN = re.compile(r"const STATIC_ASSETS = (\[.*?\]);", re.S)
 CACHE_VERSION_PATTERN = re.compile(r'(const CACHE_VERSION = ")[a-f0-9]{12}(";)')
 
 
 def validate_apps_script_url(value: str) -> str:
-    url = value.strip()
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or parsed.netloc != "script.google.com":
-        raise ValueError("APPS_SCRIPT_WEB_APP_URL muss mit https://script.google.com/ beginnen.")
-    if not parsed.path.startswith("/macros/s/") or not parsed.path.endswith("/exec"):
-        raise ValueError("APPS_SCRIPT_WEB_APP_URL muss die Web-App-URL mit /macros/s/.../exec sein.")
+    url = value
+    if APPS_SCRIPT_URL_PATTERN.fullmatch(url) is None:
+        raise ValueError("APPS_SCRIPT_WEB_APP_URL muss https://script.google.com/macros/s/<ID>/exec entsprechen.")
     return url
 
 
@@ -65,12 +62,10 @@ def main() -> None:
 
     for config_file in config_files:
         content = config_file.read_text(encoding="utf-8")
-        if PLACEHOLDER_URL in content:
-            updated = content.replace(PLACEHOLDER_URL, apps_script_url)
-        else:
-            updated, count = API_BASE_URL_PATTERN.subn(lambda match: match.group(1) + apps_script_url + match.group(2), content, count=1)
-            if count != 1:
-                raise SystemExit(f"apiBaseUrl nicht gefunden: {config_file}")
+        serialized_url = json.dumps(apps_script_url)
+        updated, count = API_BASE_URL_PATTERN.subn(lambda match: match.group(1) + serialized_url, content, count=1)
+        if count != 1:
+            raise SystemExit(f"apiBaseUrl nicht gefunden: {config_file}")
         config_file.write_text(updated, encoding="utf-8")
         refresh_service_worker(config_file.parent.parent)
 

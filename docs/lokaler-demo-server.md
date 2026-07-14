@@ -13,15 +13,18 @@ python scripts/build-apps-script.py
 python scripts/build-pages-site.py
 python scripts/verify-pages-site.py
 python tests/content-build.test.py
+python tests/frontend-modules.test.py
 python tests/configure-runtime.test.py
+npm test
 node tests/apps-script.test.js
-node tests/restricted-markdown.test.js
-node tests/frontend-core.test.js
 node tests/service-worker.test.js
-python tests/browser.test.py
+python tests/browser.test.py --browser chromium
+python tests/browser.test.py --browser firefox
+python tests/browser.test.py --browser webkit
+python tests/pwa-browser.test.py
 ```
 
-`tools/test-demo.py` bleibt zusätzlich sinnvoll, prüft aber keine schreibenden Formulare und ist kein Ersatz für `tests/browser.test.py`. Produktionssheets und die produktive `/exec`-URL gehören nicht in automatisierte Tests.
+`tests/browser.test.py` bildet die Funktionsmatrix in Chromium, Firefox und WebKit ab. `tests/pwa-browser.test.py` läuft separat mit Chromium und echten Service Workern. `tools/test-demo.py` bleibt zusätzlich sinnvoll, prüft aber keine schreibenden Formulare und ist kein Ersatz für diese Matrix. Produktionssheets und die produktive `/exec`-URL gehören nicht in automatisierte Tests.
 
 ## Voraussetzungen
 
@@ -31,6 +34,13 @@ python tests/browser.test.py
 - Node.js, aufrufbar als `node`; GitHub Actions verwendet Node.js 22.
 - Ein privates LAN für Tests mit anderen Geräten.
 - Eine Google-Apps-Script-Web-App-URL, die mit `/exec` endet.
+
+Playwright einmalig in der festgelegten Version mit allen drei Browsern installieren:
+
+```pwsh
+python -m pip install playwright==1.61.0
+python -m playwright install chromium firefox webkit
+```
 
 Versionen prüfen:
 
@@ -171,12 +181,13 @@ Der lokale Demo-Build orientiert sich an `.github/workflows/pages.yml`. Die maß
 1. `scripts/build-apps-script.py` erzeugt das deploybare Backend; `scripts/build-pages-site.py` erzeugt scope-isolierte Inhaltsindizes und Seiten.
 2. `scripts/build-pages-site.py` erzeugt `_site/` mit `DGH/` und `Gemeindehaus/`.
 3. `scripts/verify-pages-site.py` prüft Scopes, Manifest, Icons, lokale Links und Service-Worker-Registrierung.
-4. `tests/service-worker.test.js` prüft Cache- und Offline-Verhalten mit Node.js.
-5. `scripts/configure-runtime.py` schreibt `APPS_SCRIPT_WEB_APP_URL` in die Laufzeitkonfiguration unter `_site/`.
-6. `tools/demo-server.ps1` erzeugt mit mkcert Zertifikat und Schlüssel unter `tools/.certs/`.
-7. `tools/Caddyfile` stellt `_site/` unter `/Vermietung/` auf Port `8443` bereit und definiert die Weiterleitungen und statischen 404-Antworten.
+4. `tests/frontend-modules.test.py` und die Pages-Verifikation prüfen den nativen ESM-Graphen ab `assets/js/main.js`.
+5. `tests/service-worker.test.js` prüft Cache- und Offline-Verhalten mit Node.js; `tests/pwa-browser.test.py` prüft echte Worker separat mit Chromium.
+6. `scripts/configure-runtime.py` schreibt `APPS_SCRIPT_WEB_APP_URL` in die Laufzeitkonfiguration unter `_site/`.
+7. `tools/demo-server.ps1` erzeugt mit mkcert Zertifikat und Schlüssel unter `tools/.certs/`.
+8. `tools/Caddyfile` stellt `_site/` unter `/Vermietung/` auf Port `8443` bereit und definiert die Weiterleitungen und statischen 404-Antworten.
 
-GitHub Actions führt dieselben Build- und Prüfdateien aus, konfiguriert die URL dort jedoch aus dem Repository-Secret `APPS_SCRIPT_WEB_APP_URL` und lädt `_site/` anschließend als Pages-Artefakt hoch. Lokal ist kein GitHub-Secret verfügbar; deshalb verwendet `tools/demo-server.cmd` die Sitzungsvariable.
+Die lokale Demo nutzt ausgewählte Build- und PWA-Prüfungen, bildet aber nicht die vollständige Qualitätsmatrix ab. Diese muss zusätzlich gemäß `README.md` beziehungsweise `.github/workflows/pages.yml` ausgeführt werden. GitHub Actions konfiguriert die URL aus dem Repository-Secret `APPS_SCRIPT_WEB_APP_URL` und lädt `_site/` anschließend als Pages-Artefakt hoch; lokal verwendet `tools/demo-server.cmd` stattdessen die Sitzungsvariable.
 
 ## Browser-Test
 
@@ -194,12 +205,7 @@ Für LAN-Tests dieselben Punkte auf Android oder iOS über die LAN-IP prüfen. `
 
 ## Playwright-Schnelltest
 
-`tools/test-demo.py` prüft mit Chromium beide Gebäudeseiten, Secure Context, Gebäudekonfiguration, Manifest- und Service-Worker-Scopes, Weiterleitungen und 404-Antworten. Er ergänzt die vollständige Browserprüfung `tests/browser.test.py`, ersetzt sie aber nicht. Einmalig die in der Qualitätsmatrix festgelegte Playwright-Version und Chromium installieren:
-
-```pwsh
-python -m pip install playwright==1.61.0
-python -m playwright install chromium
-```
+`tools/test-demo.py` prüft mit Chromium beide Gebäudeseiten, Secure Context, Gebäudekonfiguration, Manifest- und Service-Worker-Scopes, Weiterleitungen und 404-Antworten. Er ergänzt die Browsermatrix und den separaten PWA-Test, ersetzt sie aber nicht. Die Playwright-Installation für alle drei Browser steht unter Voraussetzungen.
 
 Demo in einem Terminal laufen lassen und in einem zweiten Terminal testen:
 
@@ -229,6 +235,10 @@ Die lokale Demo bildet Build-Ausgabe, Pfade und HTTPS wesentlich genauer ab als 
 
 Der finale Stand muss deshalb zusätzlich über die bereitgestellten GitHub-Pages-URLs und auf den tatsächlich unterstützten Zielgeräten geprüft werden.
 
+### Aktualisierung auf 1.5.0
+
+Der native ESM-Schnitt enthält keine Kompatibilitätsschicht für die entfernten klassischen Legacy-Frontendskripte alter installierter PWA-Versionen. Für eine vollständige Aktualisierung die installierte PWA online öffnen, alle noch geöffneten PWA-Fenster und Browser-Tabs schließen und die PWA anschließend neu öffnen. Erst ohne alte Clients kann der neue Service Worker übernehmen und alle ESM-Dateien konsistent ausliefern.
+
 ## Fehlerbehebung
 
 ### `APPS_SCRIPT_WEB_APP_URL` Fehlt Oder Ist Ungültig
@@ -257,7 +267,7 @@ Anderen Prozess beenden, der Port `8443` verwendet, und `tools/demo-server.cmd` 
 
 ### Alte Inhalte Oder Falsches Gebäude
 
-Service Worker und Website-Daten für `localhost:8443` beziehungsweise die LAN-IP löschen, Browser schließen und Demo neu bauen. Prüfen, dass exakt `/Vermietung/DGH/` oder `/Vermietung/Gemeindehaus/` einschließlich abschließendem Schrägstrich geöffnet wurde.
+Zuerst die PWA online öffnen, alle alten PWA-Fenster und Browser-Tabs schließen und neu öffnen. Bleibt der Stand veraltet, Service Worker und Website-Daten für `localhost:8443` beziehungsweise die LAN-IP löschen, Browser schließen und Demo neu bauen. Prüfen, dass exakt `/Vermietung/DGH/` oder `/Vermietung/Gemeindehaus/` einschließlich abschließendem Schrägstrich geöffnet wurde.
 
 ### Build Oder Test Schlägt Fehl
 

@@ -16,7 +16,7 @@ Unterstützt Änderungen und Prüfungen an den Apps-Script-Anwendungen unter `ap
 
 ### pwa-development
 
-Deckt Installierbarkeit, Offline-Verhalten und Cache-Strategien der Vermietungs-PWA ab. Im Projekt betrifft das besonders `manifest.webmanifest`, `service-worker.js`, GitHub-Pages-Pfade und den Belegungs-Fallback in `assets/js/app.js`.
+Deckt Installierbarkeit, Offline-Verhalten und Cache-Strategien der Vermietungs-PWA ab. Im Projekt betrifft das besonders `manifest.webmanifest`, `service-worker.js`, GitHub-Pages-Pfade, die ESM-PWA-Registrierung in `assets/js/pwa/registration.js` und den Belegungs-Fallback in `assets/js/features/occupancy/controller.js`.
 
 - Umfang und Quelle: projektlokal unter `.agents/skills/pwa-development/`; Junction unter `.claude/skills/pwa-development/`; Quelle `alinaqi/claude-bootstrap`, festgehalten in `skills-lock.json`.
 - Typische Auslöser: Änderungen an Manifest, Service Worker, Offline-Cache, Scope, Start-URL oder Installierbarkeit.
@@ -36,7 +36,7 @@ Prüft die ausgelieferte PWA nach Lighthouse-orientierten Kriterien für Perform
 
 ### webapp-testing
 
-Unterstützt Browser- und End-to-End-Prüfungen mit nativen Python-Playwright-Skripten. Geeignete Projektziele sind Kalenderinteraktionen, Buchungs- und Kontaktformular, Responsive-Ansichten, beide Gebäudepfade, API-Fehler und Offline-Fallback. Das Repository enthält derzeit keine eigene Playwright-Konfiguration oder Testsuite.
+Unterstützt Browser- und End-to-End-Prüfungen mit nativen Python-Playwright-Skripten. Geeignete Projektziele sind Kalenderinteraktionen, Buchungs- und Kontaktformular, Responsive-Ansichten, beide Gebäudepfade, API-Fehler und Offline-Fallback. `tests/browser.test.py` prüft Chromium, Firefox und WebKit; `tests/pwa-browser.test.py` prüft separat Chromium mit echten Service Workern und Offline-Neuladen.
 
 - Umfang und Quelle: projektlokal unter `.agents/skills/webapp-testing/`; Junction unter `.claude/skills/webapp-testing/`; Quelle `anthropics/skills`, festgehalten in `skills-lock.json`.
 - Typische Auslöser: Browser-, Formular-, Responsive-, Interaktions- oder End-to-End-Tests sowie Screenshots und Browserlogs.
