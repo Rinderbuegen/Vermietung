@@ -354,7 +354,9 @@
         contactEmail: config.contactEmail || building.contactEmail
       });
       const note = document.querySelector("[data-public-note]");
-      if (note && building.publicNote) note.textContent = building.publicNote;
+      const frontendPublicNote = typeof texts.publicNote === "string" ? texts.publicNote.trim() : "";
+      const buildingPublicNote = typeof building.publicNote === "string" ? building.publicNote.trim() : "";
+      if (note && !frontendPublicNote && buildingPublicNote) note.textContent = building.publicNote;
     } catch (error) {
       console.warn(error);
     }

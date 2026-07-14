@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from html import escape
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -20,6 +22,11 @@ except ImportError as error:
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "_site"
 FIXED_NOW = 1784024100000
+FRONTEND_PUBLIC_NOTE = "Prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage. Die verbindliche Bestätigung erfolgt durch den Betreiber."
+BUILDING_PUBLIC_NOTES = {
+    "dgh_rb": "DGH-API-Hinweis: Bitte freie Zeiten vor der Anfrage prüfen.",
+    "ev_gem_rb": "Gemeindehaus-API-Hinweis: Verfügbarkeit vor der Anfrage abstimmen.",
+}
 
 
 @contextmanager
@@ -36,11 +43,13 @@ def local_server():
         thread.join(timeout=5)
 
 
-def config_for(scope: str, origin: str) -> str:
+def config_for(scope: str, origin: str, public_note=None) -> str:
     raw = (SITE / scope / "config" / "config.js").read_text(encoding="utf-8")
     payload = json.loads(raw.removeprefix("window.APP_CONFIG = ").rstrip(";\n"))
     payload["apiBaseUrl"] = f"{origin}/exec"
     payload["registerServiceWorker"] = False
+    if public_note is not None:
+        payload["texts"]["publicNote"] = public_note
     return "window.APP_CONFIG = " + json.dumps(payload, ensure_ascii=False) + ";\n"
 
 
@@ -57,7 +66,7 @@ def occupancy(building_id: str, requested_to: str) -> list[dict]:
     ]
 
 
-def install_routes(context, origin: str, online: dict[str, bool], request_count: dict[str, int]):
+def install_routes(context, origin: str, online: dict[str, bool], request_count: dict[str, int], public_note=None, api_public_note=None):
     def route_all(route):
         request = route.request
         parsed = urlparse(request.url)
@@ -67,9 +76,21 @@ def install_routes(context, origin: str, online: dict[str, bool], request_count:
             else:
                 route.abort()
             return
+        if public_note is not None and request.resource_type == "document" and parsed.path in ("/DGH/", "/Gemeindehaus/"):
+            scope = parsed.path.strip("/")
+            source = (SITE / scope / "index.html").read_text(encoding="utf-8")
+            body, replacements = re.subn(
+                r'(<p class="lead" data-public-note>).*?(</p>)',
+                lambda match: match.group(1) + escape(public_note) + match.group(2),
+                source,
+                count=1,
+            )
+            assert replacements == 1, f"Hero-Hinweis fehlt in {scope}/index.html"
+            route.fulfill(status=200, content_type="text/html", body=body)
+            return
         if parsed.path.endswith("/config/config.js"):
             scope = "Gemeindehaus" if "/Gemeindehaus/" in parsed.path else "DGH"
-            route.fulfill(status=200, content_type="application/javascript", body=config_for(scope, origin))
+            route.fulfill(status=200, content_type="application/javascript", body=config_for(scope, origin, public_note))
             return
         if parsed.path == "/exec":
             query = parse_qs(parsed.query)
@@ -83,7 +104,8 @@ def install_routes(context, origin: str, online: dict[str, bool], request_count:
             if action == "occupancy":
                 data = {"schemaVersion": 2, "loadedAt": "2026-07-14T10:15:00.000Z", "items": occupancy(building_id, query.get("to", [""])[0])}
             elif action == "building":
-                data = {"name": building_id, "operatorName": "Test", "contactEmail": "test@example.org", "publicNote": "Test"}
+                response_public_note = BUILDING_PUBLIC_NOTES[building_id] if api_public_note is None else api_public_note
+                data = {"name": building_id, "operatorName": "Test", "contactEmail": "test@example.org", "publicNote": response_public_note}
             else:
                 data = {"items": []}
             route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "data": data}))
@@ -103,6 +125,67 @@ def assert_no_store(page, request_count: int) -> None:
     assert all(entry["cache"] == "no-store" for entry in fetches)
 
 
+def assert_public_note_regression(browser, origin: str) -> None:
+    cases = (
+        ("DGH", FRONTEND_PUBLIC_NOTE, None, FRONTEND_PUBLIC_NOTE),
+        ("Gemeindehaus", FRONTEND_PUBLIC_NOTE, None, FRONTEND_PUBLIC_NOTE),
+        ("DGH", "", None, BUILDING_PUBLIC_NOTES["dgh_rb"]),
+        ("Gemeindehaus", "", None, BUILDING_PUBLIC_NOTES["ev_gem_rb"]),
+        ("DGH", " \t\n", None, BUILDING_PUBLIC_NOTES["dgh_rb"]),
+        ("DGH", "", "", ""),
+        ("DGH", "", {"invalid": "public note"}, ""),
+    )
+    for scope, frontend_note, api_public_note, expected_note in cases:
+        errors: list[str] = []
+        online = {"value": True}
+        request_count = {"occupancy": 0}
+        context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+        try:
+            context.add_init_script("""
+              (() => {
+                let releaseBuildingGate;
+                const buildingGate = new Promise((resolve) => { releaseBuildingGate = resolve; });
+                window.__buildingResponseReceived = false;
+                window.__buildingProcessingComplete = false;
+                window.__releaseBuildingGate = () => releaseBuildingGate();
+                const nativeFetch = window.fetch.bind(window);
+                window.fetch = async (input, options) => {
+                  const url = new URL(input instanceof URL ? input.href : typeof input === "string" ? input : input.url, window.location.href);
+                  if (url.searchParams.get("action") !== "building") return nativeFetch(input, options);
+                  const response = await nativeFetch(input, options);
+                  window.__buildingResponseReceived = true;
+                  await buildingGate;
+                  return response;
+                };
+                document.addEventListener("DOMContentLoaded", () => {
+                  const applyConfig = window.Ui.applyConfig;
+                  window.Ui.applyConfig = (...args) => {
+                    const result = applyConfig(...args);
+                    if (window.__buildingResponseReceived) window.__buildingProcessingComplete = true;
+                    return result;
+                  };
+                }, { once: true });
+              })();
+            """)
+            install_routes(context, origin, online, request_count, frontend_note, api_public_note)
+            page = context.new_page()
+            page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(f"{origin}/{scope}/", wait_until="domcontentloaded")
+            page.wait_for_function("window.__buildingResponseReceived === true")
+
+            note = page.locator("[data-public-note]")
+            assert page.evaluate("window.APP_CONFIG.texts.publicNote") == frontend_note
+            assert note.text_content() == frontend_note
+
+            page.evaluate("window.__releaseBuildingGate()")
+            page.wait_for_function("window.__buildingProcessingComplete === true")
+            assert note.text_content() == expected_note
+            assert not errors, f"Browser-Fehler in {scope} mit Hinweis {frontend_note!r}: " + " | ".join(errors)
+        finally:
+            context.close()
+
+
 def main() -> None:
     if not SITE.is_dir():
         raise SystemExit("_site fehlt. Zuerst python scripts/build-pages-site.py ausführen.")
@@ -111,6 +194,7 @@ def main() -> None:
     request_count = {"occupancy": 0}
     with local_server() as origin, sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
+        assert_public_note_regression(browser, origin)
         context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
         context.add_init_script(f"""
           (() => {{
