@@ -3,7 +3,7 @@ const BACKEND_CONFIG = {
     "dgh_rb": {
       "spreadsheetId": "11yws8ZxRB9U2oyeW8hwwC_WTR1AYLao4_iNkZEIwThc",
       "name": "Dorfgemeinschaftshaus Rinderbügen",
-      "operatorName": "Betreiber Dorfgemeinschaftshaus Rinderbügen",
+      "operatorName": "Eigentümer Dorfgemeinschaftshaus Rinderbügen",
       "contactEmail": "kontakt@example.com",
       "notifyEmail": "kontakt@example.com",
       "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",
@@ -13,7 +13,7 @@ const BACKEND_CONFIG = {
     "ev_gem_rb": {
       "spreadsheetId": "1GaqxZtkEx_lByT1odJXkS4Rp80Kr4cuLwFWz32Ssq1E",
       "name": "Evangelisches Gemeindehaus Rinderbügen",
-      "operatorName": "Betreiber Evangelisches Gemeindehaus Rinderbügen",
+      "operatorName": "Eigentümer Evangelisches Gemeindehaus Rinderbügen",
       "contactEmail": "kontakt@example.com",
       "notifyEmail": "kontakt@example.com",
       "publicNote": "Bitte prüfen Sie freie Zeiten und senden Sie eine unverbindliche Anfrage.",

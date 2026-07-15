@@ -12,4 +12,4 @@ Die Zufahrtstraße zwischen Wolferborn und Rinderbügen wird mit einem Radweg mo
 
 Die Feldstraßen von Michelau und von Leisenwald sind nicht für den Verkehr freigegeben und das Ordnungsamt kontrolliert hier streng.
 
-Bitte beachten sie auch die Hinweise auf die aktuelle Sperrungen beim Baustellenbetreiber Hessen Mobil.  https://mobil.hessen.de/Themen-A-Z/baustellen
+Bitte beachten Sie auch die Hinweise auf die aktuellen Sperrungen bei Hessen Mobil. https://mobil.hessen.de/Themen-A-Z/baustellen

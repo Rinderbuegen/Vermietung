@@ -237,8 +237,8 @@ h1 {
   max-width: 700px;
   overflow-wrap: break-word;
   word-break: normal;
-  hyphens: none;
-  font-size: clamp(2.15rem, 4.8vw, 4rem);
+  hyphens: auto;
+  font-size: clamp(2.15rem, 3.5vw, 3rem);
   font-weight: 300;
   color: #fff;
 }

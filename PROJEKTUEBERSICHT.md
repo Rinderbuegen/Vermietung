@@ -2,7 +2,7 @@
 
 ## Stand
 
-Version 1.5.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
+Version 1.6.0. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktanfragen, News, Downloads und Gebäudeinformationen. Keine eigene Datenbank oder Adminoberfläche.
 
 ## Architektur
 
@@ -16,6 +16,7 @@ Version 1.5.1. Statische PWA für öffentliche Belegung, Buchungs- und Kontaktan
 - Downloads: nur `downloads/oeffentlich`; `downloads/quellen` und `.odt` werden ausgeschlossen.
 - PWA: Build erzeugt für beide Gebäude einen scope-eigenen klassischen Service Worker. Sein Cache-Key hasht Pfade und Inhalte aller Precache-Dateien. Root bleibt ohne Worker.
 - Texte: sichtbare UI-Texte kommen aus `betreiber/allgemein/texte/frontend.json`, Rechtstexte aus `rechtliches.md`; Gebäude können `frontend.json` überschreiben. Nichtleerer Frontend-Hinweis hat Vorrang; `building.publicNote` der Gebäude-API nur Fallback.
+- Hero: Die Gebäudekarte kennzeichnet den Namen als „Eigentümer“ und verlinkt direkt auf das Kontaktformular. Die Überschrift erlaubt deutsche Silbentrennung.
 - Backend: Google Apps Script und private Google Sheets. `scripts/build-apps-script.py` injiziert Betreiberkonfiguration/-texte in direkt deploybares `apps-script/buchungs-api/Code.gs`.
 - Runtime: `scripts/configure-runtime.py` ersetzt nur die öffentliche Apps-Script-Web-App-URL im Buildartefakt. Quellen für Laufzeitwerte liegen unter `betreiber/**/konfiguration/frontend.json`; das klassische `config/config.js` ist ein scope-eigenes Buildprodukt und setzt mit `window.APP_CONFIG` das einzige globale Frontendobjekt vor dem ESM-Einstieg.
 - Belegung: Zeitraumwechsel ruft die öffentliche Belegung automatisch ab, Plan-/Listenwechsel rendert lokal. Der Browserdruck nutzt einen eingefrorenen Snapshot der geladenen öffentlichen Daten, markiert Offline- oder stale-Daten und druckt A4-Hochformat.

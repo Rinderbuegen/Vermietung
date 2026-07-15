@@ -35,9 +35,14 @@ for area, entry in registry["areas"].items():
     assert "publicShowBookingTitles" not in rendered_config
     assert "publicShowBookingDetails" not in rendered_config
     index_html = (scope / "index.html").read_text(encoding="utf-8")
+    about = json.loads((scope / "assets/data/about.json").read_text(encoding="utf-8"))
     assert index_html.count('type="module"') == 1
     assert '<script type="module" src="assets/js/main.js"></script>' in index_html
     assert '<script src="config/config.js"></script>' in index_html
+    assert "<dt>Eigentümer</dt>" in index_html
+    assert '<a href="#kontakt">Kontaktformular</a>' in index_html
+    assert "Betreiber" not in index_html
+    assert "Betreiber" not in json.dumps(about, ensure_ascii=False)
     frontend_scripts = re.findall(r'<script\b[^>]*\bsrc=["\'](assets/js/[^"\']+)["\']', index_html)
     assert frontend_scripts == ["assets/js/main.js"], f"{area}: unerwartete Frontend-Script-Tags: {frontend_scripts}"
     graph = module_graph(scope / "assets/js")
@@ -57,6 +62,8 @@ assert '<script type="module" src="assets/js/main.js"></script>' in root_index
 assert module_graph(SITE / "assets/js") == scope_graphs[0]
 assert "{{" not in (SITE / "DGH/index.html").read_text(encoding="utf-8")
 assert "Datenschutz" in (SITE / "DGH/index.html").read_text(encoding="utf-8")
+for artifact in [*SITE.rglob("*.html"), *SITE.rglob("*.json")]:
+    assert "betreiber" not in artifact.read_text(encoding="utf-8").lower(), f"{artifact}: sichtbarer Betreibertext"
 
 pages_spec = importlib.util.spec_from_file_location("build_pages_site", ROOT / "scripts/build-pages-site.py")
 pages = importlib.util.module_from_spec(pages_spec)
