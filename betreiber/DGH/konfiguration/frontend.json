@@ -4,7 +4,7 @@
   "heroTitle": "Dorfgemeinschaftshaus",
   "heroLocation": "Rinderbügen",
   "operatorName": "Stadt Büdingen",
-  "contactDetails": ["Kuno van Euten", "Außenstellenbeauftragter", "0161/123123123123", "kuno@test.de"],
-  "contactEmail": "kuno@test.de",
+  "contactDetails": ["Monika Heß", "Außenstellenbeauftragte", "99999999"],
+  "contactEmail": "monika.hess.rb@googlemail.com",
   "theme": {"primary":"#6c0e15","primaryDark":"#5a0b11","secondary":"#872323","link":"#6c0e15","bgPage":"#eaeaea","bgMuted":"#f0f0f0","border":"#d8d2c6","dark":"#525151"}
 }

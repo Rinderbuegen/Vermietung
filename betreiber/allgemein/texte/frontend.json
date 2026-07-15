@@ -19,7 +19,7 @@
   "buildingDataLabel": "Gebäudedaten",
   "loading": "Wird geladen",
   "contactLabel": "Kontakt",
-  "contactFallback": "kontakt@example.com",
+  "contactFallback": "hesspet@gmx.de",
   "occupancyTitle": "Belegung",
   "occupancyIntro": "Anzeige der Belegung. Datum, Zeit und Status sind öffentlich; Veranstaltung und Veranstalter erscheinen nur nach ausdrücklicher Freigabe durch den Eigentümer. Freigegebene Angaben können auf diesem Gerät für bis zu 24 Stunden für die Offlineanzeige gespeichert bleiben.",
   "rangeLabel": "Zeitraum",
