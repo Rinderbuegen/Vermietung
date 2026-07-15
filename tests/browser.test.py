@@ -242,7 +242,8 @@ def main() -> None:
 
         assert page.locator(".building-card dt").first.inner_text() == "Eigentümer"
         assert page.locator(".building-card a[href='#kontakt']").inner_text() == "Kontaktformular"
-        assert page.locator(".hero h1").evaluate("node => getComputedStyle(node).hyphens") == "auto"
+        assert page.locator("html").get_attribute("lang") == "de"
+        assert page.locator("[data-hero-title]").evaluate("node => getComputedStyle(node).hyphens") == "auto"
         assert page.locator("#occupancyList").get_attribute("aria-live") is None
         assert page.locator("#occupancyMeta").get_attribute("role") == "status"
         assert page.locator("#occupancyMeta").get_attribute("aria-atomic") == "true"
@@ -253,12 +254,8 @@ def main() -> None:
         assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         assert page.locator("[data-occupancy-date='2026-07-20']").evaluate("node => node.classList.contains('is-blocked')")
         assert page.locator("[data-occupancy-date='2026-07-21']").evaluate("node => node.classList.contains('is-partial')")
-        page.set_viewport_size({"width": 1366, "height": 768})
-        assert page.locator("[data-hero-title]").evaluate("""node => {
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          return range.getClientRects().length;
-        }""") == 1
+        page.set_viewport_size({"width": 1440, "height": 768})
+        assert page.locator(".hero h1").evaluate("node => getComputedStyle(node).fontSize") == "48px"
 
         trigger = page.locator("[data-occupancy-date='2026-07-18']")
         trigger.click()

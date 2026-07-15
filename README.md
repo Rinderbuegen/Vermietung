@@ -1,6 +1,6 @@
 # Gebäudevermietung PWA
 
-Version 1.6.0. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
+Version 1.6.1. Statische, offlinefähige PWA für Dorfgemeinschaftshaus und Evangelisches Gemeindehaus Rinderbügen. Öffentliche Belegung und Formulare nutzen eine Google-Apps-Script-Web-App; private Daten bleiben in Google Sheets.
 
 ## Öffentliche URLs und IDs
 
