@@ -57,7 +57,7 @@
   "timeFromLabel": "Uhrzeit von *",
   "timeToLabel": "Uhrzeit bis *",
   "nameLabel": "Name *",
-  "requesterContactLabel": "Kontaktmöglichkeit *",
+  "requesterContactLabel": "Für Rückfragen (E-Mail oder Tel.) *",
   "requesterContactPlaceholder": "E-Mail oder Telefonnummer",
   "purposeLabel": "Zweck / Titel *",
   "noteLabel": "Bemerkung",
